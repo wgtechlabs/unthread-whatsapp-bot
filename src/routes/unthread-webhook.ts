@@ -1,8 +1,8 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import type { UnthreadWebhookEvent } from "../types.js";
-import { sendWhatsAppMessage, toWhatsAppFormat } from "../services/twilio.js";
-import { findPhoneByConversationId } from "../services/customer-store.js";
+import type { UnthreadWebhookEvent } from "../types";
+import { sendWhatsAppMessage, toWhatsAppFormat } from "../services/twilio";
+import { findPhoneByConversationId } from "../services/customer-store";
 
 export const unthreadWebhookRouter = Router();
 

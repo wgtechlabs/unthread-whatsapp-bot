@@ -1,5 +1,5 @@
-import type { CustomerMapping } from "../types.js";
-import * as unthread from "./unthread.js";
+import type { CustomerMapping } from "../types";
+import * as unthread from "./unthread";
 
 // In-memory store for phone -> customer mappings
 // TODO: Replace with persistent storage (Redis/MongoDB) for production

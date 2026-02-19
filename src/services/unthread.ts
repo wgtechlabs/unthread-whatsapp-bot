@@ -1,9 +1,9 @@
-import { config } from "../config.js";
+import { config } from "../config";
 import type {
   UnthreadCustomer,
   UnthreadConversation,
   UnthreadMessage,
-} from "../types.js";
+} from "../types";
 
 const headers = {
   "Content-Type": "application/json",

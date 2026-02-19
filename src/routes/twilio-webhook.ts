@@ -1,9 +1,9 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
-import type { TwilioIncomingMessage } from "../types.js";
-import { extractPhone } from "../services/twilio.js";
-import { resolveCustomer, resolveConversation } from "../services/customer-store.js";
-import * as unthread from "../services/unthread.js";
+import type { TwilioIncomingMessage } from "../types";
+import { extractPhone } from "../services/twilio";
+import { resolveCustomer, resolveConversation } from "../services/customer-store";
+import * as unthread from "../services/unthread";
 
 export const twilioWebhookRouter = Router();
 

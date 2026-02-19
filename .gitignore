@@ -3,3 +3,4 @@ dist/
 .env
 *.log
 .claude/
+package-lock.json

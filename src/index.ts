@@ -1,7 +1,7 @@
 import express from "express";
-import { config } from "./config.js";
-import { twilioWebhookRouter } from "./routes/twilio-webhook.js";
-import { unthreadWebhookRouter } from "./routes/unthread-webhook.js";
+import { config } from "./config";
+import { twilioWebhookRouter } from "./routes/twilio-webhook";
+import { unthreadWebhookRouter } from "./routes/unthread-webhook";
 
 const app = express();
 

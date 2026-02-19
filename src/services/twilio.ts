@@ -1,5 +1,5 @@
 import Twilio from "twilio";
-import { config } from "../config.js";
+import { config } from "../config";
 
 const client = Twilio(config.twilio.accountSid, config.twilio.authToken);
 
