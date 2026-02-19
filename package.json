@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@wgtechlabs/log-engine": "^2.3.1",
     "express": "^5.1.0",
     "twilio": "^5.5.1"
   },

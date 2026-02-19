@@ -1,4 +1,5 @@
 import Twilio from "twilio";
+import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
 
 const client = Twilio(config.twilio.accountSid, config.twilio.authToken);
@@ -14,7 +15,7 @@ export async function sendWhatsAppMessage(
     body,
   });
 
-  console.log(`[twilio] Sent message ${message.sid} to ${to}`);
+  LogEngine.debug("WhatsApp message sent via Twilio", { sid: message.sid, to });
   return message.sid;
 }
 

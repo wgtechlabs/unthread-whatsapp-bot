@@ -1,4 +1,5 @@
 import express from "express";
+import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "./config";
 import { twilioWebhookRouter } from "./routes/twilio-webhook";
 import { unthreadWebhookRouter } from "./routes/unthread-webhook";
@@ -22,8 +23,8 @@ app.use("/webhooks/twilio", twilioWebhookRouter);
 app.use("/webhooks/unthread", unthreadWebhookRouter);
 
 app.listen(config.port, () => {
-  console.log(`[server] Unthread WhatsApp Bot running on port ${config.port}`);
-  console.log(`[server] Twilio webhook:   POST /webhooks/twilio`);
-  console.log(`[server] Unthread webhook: POST /webhooks/unthread`);
-  console.log(`[server] Health check:     GET  /health`);
+  LogEngine.log(`Unthread WhatsApp Bot running on port ${config.port}`);
+  LogEngine.info("Twilio webhook:   POST /webhooks/twilio");
+  LogEngine.info("Unthread webhook: POST /webhooks/unthread");
+  LogEngine.info("Health check:     GET  /health");
 });
