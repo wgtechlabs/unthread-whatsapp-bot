@@ -1,0 +1,53 @@
+// Twilio incoming WhatsApp message payload
+export interface TwilioIncomingMessage {
+  MessageSid: string;
+  AccountSid: string;
+  From: string; // "whatsapp:+1234567890"
+  To: string; // "whatsapp:+0987654321"
+  Body: string;
+  NumMedia: string;
+  ProfileName?: string;
+  WaId?: string; // WhatsApp ID (phone number without +)
+}
+
+// Unthread API types
+export interface UnthreadCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+}
+
+export interface UnthreadConversation {
+  id: string;
+  customerId: string;
+  status: string;
+  title?: string;
+}
+
+export interface UnthreadMessage {
+  id: string;
+  conversationId: string;
+  body: string;
+  type: string;
+}
+
+// Unthread webhook event payload
+export interface UnthreadWebhookEvent {
+  type: string;
+  data: {
+    id: string;
+    conversationId?: string;
+    body?: string;
+    customerId?: string;
+    [key: string]: unknown;
+  };
+}
+
+// Internal mapping: WhatsApp phone -> Unthread customer
+export interface CustomerMapping {
+  phone: string; // E.164 format: +1234567890
+  customerId: string;
+  conversationId: string | null;
+  profileName: string | null;
+}
