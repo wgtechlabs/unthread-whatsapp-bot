@@ -1,22 +1,34 @@
+import type { NuvexClient } from "@wgtechlabs/nuvex";
 import type { CustomerMapping } from "../types";
 import * as unthread from "./unthread";
 
-// In-memory store for phone -> customer mappings
-// TODO: Replace with persistent storage (Redis/MongoDB) for production
-const store = new Map<string, CustomerMapping>();
+// Nuvex namespaces
+const NS_PHONE = "wa:phone";  // phone -> CustomerMapping
+const NS_CONVO = "wa:convo";  // conversationId -> phone (reverse index)
+
+let _storage: NuvexClient;
+
+export function setStorage(client: NuvexClient): void {
+  _storage = client;
+}
+
+function storage(): NuvexClient {
+  if (!_storage) throw new Error("Storage not initialized. Call setStorage() first.");
+  return _storage;
+}
 
 // Resolve or create an Unthread customer from a WhatsApp message
 export async function resolveCustomer(
   phone: string,
   profileName: string | null,
 ): Promise<CustomerMapping> {
-  // Check in-memory cache first
-  const existing = store.get(phone);
+  // Check storage first (memory -> Redis -> Postgres via Nuvex)
+  const existing = await storage().getNamespaced(NS_PHONE, phone) as CustomerMapping | null;
   if (existing) {
     return existing;
   }
 
-  // Try to find existing customer by dummy email
+  // Try to find existing customer in Unthread by dummy email
   const cleanPhone = phone.replace(/[^0-9]/g, "");
   const dummyEmail = `${cleanPhone}@whatsapp.user`;
   const existingCustomer = await unthread.findCustomerByEmail(dummyEmail);
@@ -28,11 +40,11 @@ export async function resolveCustomer(
       conversationId: null,
       profileName,
     };
-    store.set(phone, mapping);
+    await storage().setNamespaced(NS_PHONE, phone, mapping);
     return mapping;
   }
 
-  // Create new customer
+  // Create new customer in Unthread
   const name = profileName || phone;
   const customer = await unthread.createCustomer(phone, name);
 
@@ -42,7 +54,7 @@ export async function resolveCustomer(
     conversationId: null,
     profileName,
   };
-  store.set(phone, mapping);
+  await storage().setNamespaced(NS_PHONE, phone, mapping);
   return mapping;
 }
 
@@ -58,7 +70,7 @@ export async function resolveConversation(
         return mapping.conversationId;
       }
     } catch {
-      // Conversation not found or closed, create new one
+      // Conversation not found or closed, fall through to create new one
     }
   }
 
@@ -66,31 +78,17 @@ export async function resolveConversation(
   const title = `WhatsApp: ${mapping.profileName || mapping.phone}`;
   const convo = await unthread.createConversation(mapping.customerId, title);
 
-  // Update mapping
+  // Persist updated mapping and reverse index
   mapping.conversationId = convo.id;
-  store.set(mapping.phone, mapping);
+  await storage().setNamespaced(NS_PHONE, mapping.phone, mapping);
+  await storage().setNamespaced(NS_CONVO, convo.id, mapping.phone);
 
   return convo.id;
 }
 
-// Look up phone number by customer ID (for outbound messages)
-export function findPhoneByCustomerId(customerId: string): string | null {
-  for (const mapping of store.values()) {
-    if (mapping.customerId === customerId) {
-      return mapping.phone;
-    }
-  }
-  return null;
-}
-
-// Look up phone number by conversation ID (for outbound messages)
-export function findPhoneByConversationId(
+// Look up phone number by conversation ID (for outbound agent replies)
+export async function findPhoneByConversationId(
   conversationId: string,
-): string | null {
-  for (const mapping of store.values()) {
-    if (mapping.conversationId === conversationId) {
-      return mapping.phone;
-    }
-  }
-  return null;
+): Promise<string | null> {
+  return await storage().getNamespaced(NS_CONVO, conversationId) as string | null;
 }

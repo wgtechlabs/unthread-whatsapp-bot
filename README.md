@@ -1,6 +1,6 @@
 # Unthread WhatsApp Bot
 
-WhatsApp customer support integration for Unthread via Twilio.
+WhatsApp customer support integration for [Unthread](https://unthread.io) via Twilio.
 
 Customers message a WhatsApp business number, messages flow into Unthread as tickets, and agent replies are sent back to WhatsApp.
 
@@ -16,14 +16,16 @@ Agent replies in Unthread → Webhook → Bot → Twilio → Customer (WhatsApp)
 
 ### Prerequisites
 
-- Node.js 20+
+- [Bun](https://bun.sh) v1.0+
+- PostgreSQL database
 - Twilio account with WhatsApp sandbox (or approved number)
 - Unthread API key
+- Redis (optional, recommended for production)
 
 ### Install
 
 ```bash
-npm install
+bun install
 ```
 
 ### Configure
@@ -38,11 +40,10 @@ cp .env.example .env
 
 ```bash
 # Development (with hot reload)
-npm run dev
+bun dev
 
 # Production
-npm run build
-npm start
+bun start
 ```
 
 ### Endpoints
@@ -64,9 +65,6 @@ npm start
 1. In Unthread, configure a webhook pointing to `https://your-domain.com/webhooks/unthread`
 2. Subscribe to `message_created` events
 
-## Customer Mapping
+## Storage
 
-- WhatsApp phone number is always captured
-- Customers are created with dummy email: `{phone}@whatsapp.user`
-- Customer names are prefixed with `[WhatsApp]`
-- If a customer provides their email, it can be matched to an existing Unthread profile (future enhancement)
+Uses [Nuvex](https://github.com/wgtechlabs/nuvex) for multi-layer storage (Memory + Redis + PostgreSQL). Customer-to-conversation mappings are persisted across restarts via PostgreSQL, with optional Redis caching for faster lookups.

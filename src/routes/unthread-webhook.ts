@@ -43,7 +43,7 @@ async function handleOutboundMessage(event: UnthreadWebhookEvent): Promise<void>
   }
 
   // Look up the WhatsApp phone number for this conversation
-  const phone = findPhoneByConversationId(conversationId);
+  const phone = await findPhoneByConversationId(conversationId);
   if (!phone) {
     LogEngine.warn("No WhatsApp mapping found for conversation", { conversationId });
     return;
