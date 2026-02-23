@@ -1,0 +1,41 @@
+# Version control
+**/.git
+**/.gitignore
+
+# Environment files
+**/.env
+**/.env.local
+**/.env.development
+**/.env.production
+
+# IDE and editor files
+**/.vscode
+**/.idea
+
+# Dependencies and build output
+**/node_modules
+**/dist
+**/build
+**/.cache
+**/.turbo
+
+# Logs
+**/*.log
+npm-debug.log*
+bun-debug.log*
+
+# Docker and compose files not required in runtime image
+**/.dockerignore
+**/docker-compose*
+**/compose.y*ml
+**/Dockerfile*
+
+# Tests and coverage
+**/*.test.ts
+**/*.spec.ts
+**/coverage
+
+# Docs and metadata
+README.md
+LICENSE
+AGENTS.md

@@ -1,0 +1,67 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wgtechlabs/unthread-whatsapp-bot:local
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      POSTGRES_URL: postgresql://postgres:postgres@postgres-platform:5432/unthread_whatsapp
+      REDIS_URL: redis://redis-platform:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres-platform:
+        condition: service_healthy
+      redis-platform:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - unthread-integration-network
+
+  postgres-platform:
+    image: ghcr.io/railwayapp-templates/postgres-ssl:17
+    restart: always
+    environment:
+      POSTGRES_DB: unthread_whatsapp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - unthread-integration-network
+
+  redis-platform:
+    image: redis:8-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_platform_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - unthread-integration-network
+
+volumes:
+  postgres_data:
+  redis_platform_data:
+
+networks:
+  unthread-integration-network:
+    driver: bridge
+    name: unthread-integration-network

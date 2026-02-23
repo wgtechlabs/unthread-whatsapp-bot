@@ -37,5 +37,7 @@ jobs:
         if: steps.dockerfile.outputs.exists == 'true'
         uses: wgtechlabs/container-build-flow-action@v1.3.1
         with:
-          registry: ghcr
+          registry: both
+          dockerhub-username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
           ghcr-token: ${{ github.token }}
