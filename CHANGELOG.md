@@ -1,0 +1,25 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+
+## [1.0.0] - 2026-02-23
+
+### Added
+
+- whatsapp bot scaffold with twilio and unthread integration
+- initial commit
+
+### Changed
+
+- add release and container build workflows
+- integrate @wgtechlabs/nuvex sdk from npm registry
+- replace console calls with log-engine
+- migrate from node/tsx to bun runtime
+- exclude .claude directory from version control
+
