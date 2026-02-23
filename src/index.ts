@@ -6,8 +6,11 @@ import { config } from "./config";
 import { setStorage } from "./services/customer-store";
 import { twilioWebhookRouter } from "./routes/twilio-webhook";
 import { unthreadWebhookRouter } from "./routes/unthread-webhook";
+import { UnthreadWebhookConsumer } from "./services/unthread-webhook-consumer";
 
 async function bootstrap() {
+  let webhookConsumer: UnthreadWebhookConsumer | null = null;
+
   const nuvexConfig: NuvexConfig = {
     postgres: config.storage.postgres,
   };
@@ -20,6 +23,17 @@ async function bootstrap() {
   const storage = await NuvexClient.initialize(nuvexConfig);
   setStorage(storage);
   LogEngine.info("Storage: Nuvex initialized");
+
+  if (config.webhook.redisUrl) {
+    webhookConsumer = new UnthreadWebhookConsumer({
+      redisUrl: config.webhook.redisUrl,
+      queueName: config.webhook.queueName,
+    });
+    await webhookConsumer.start();
+    LogEngine.info("Webhook queue consumer enabled", {
+      queueName: config.webhook.queueName,
+    });
+  }
 
   const app = express();
 
@@ -40,6 +54,19 @@ async function bootstrap() {
     LogEngine.info("Unthread webhook: POST /webhooks/unthread");
     LogEngine.info("Health check:     GET  /health");
   });
+
+  const shutdown = async () => {
+    try {
+      if (webhookConsumer) {
+        await webhookConsumer.stop();
+      }
+    } finally {
+      process.exit(0);
+    }
+  };
+
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 }
 
 bootstrap().catch((err) => {

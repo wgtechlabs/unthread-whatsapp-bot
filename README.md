@@ -9,7 +9,7 @@ Customers message a WhatsApp business number, messages flow into Unthread as tic
 ```
 Customer (WhatsApp) → Twilio → Bot → Unthread (ticket created)
                                           ↓
-Agent replies in Unthread → Webhook → Bot → Twilio → Customer (WhatsApp)
+Agent replies in Unthread → Webhook Server → Redis Queue → Bot → Twilio → Customer (WhatsApp)
 ```
 
 ## Setup
@@ -20,7 +20,8 @@ Agent replies in Unthread → Webhook → Bot → Twilio → Customer (WhatsApp)
 - PostgreSQL database
 - Twilio account with WhatsApp sandbox (or approved number)
 - Unthread API key
-- Redis (optional, recommended for production)
+- Redis for platform storage/cache
+- Redis for webhook queue (used by `wgtechlabs/unthread-webhook-server`)
 
 ### Install
 
@@ -51,7 +52,7 @@ bun start
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/webhooks/twilio` | Twilio WhatsApp incoming messages |
-| POST | `/webhooks/unthread` | Unthread webhook (agent replies) |
+| POST | `/webhooks/unthread` | Direct Unthread webhook fallback (optional) |
 | GET | `/health` | Health check |
 
 ### Twilio Sandbox Setup
@@ -62,9 +63,11 @@ bun start
 
 ### Unthread Webhook Setup
 
-1. In Unthread, configure a webhook pointing to `https://your-domain.com/webhooks/unthread`
-2. Subscribe to `message_created` events
+1. Run `wgtechlabs/unthread-webhook-server` with `TARGET_PLATFORM=whatsapp`
+2. In Unthread, configure a webhook pointing to your webhook-server endpoint:
+   `https://your-domain.com/unthread-webhook`
+3. Subscribe to `message_created` events
 
 ## Storage
 
-Uses [Nuvex](https://github.com/wgtechlabs/nuvex) for multi-layer storage (Memory + Redis + PostgreSQL). Customer-to-conversation mappings are persisted across restarts via PostgreSQL, with optional Redis caching for faster lookups.
+Uses [Nuvex](https://github.com/wgtechlabs/nuvex) for multi-layer storage (Memory + Redis + PostgreSQL). Customer-to-conversation mappings are persisted across restarts via PostgreSQL, with Redis used for both platform caching and webhook queue consumption.

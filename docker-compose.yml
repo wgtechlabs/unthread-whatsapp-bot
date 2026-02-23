@@ -11,12 +11,31 @@ services:
       PORT: 3000
       POSTGRES_URL: postgresql://postgres:postgres@postgres-platform:5432/unthread_whatsapp
       REDIS_URL: redis://redis-platform:6379
+      WEBHOOK_REDIS_URL: redis://redis-webhook:6379
     ports:
       - "3000:3000"
     depends_on:
       postgres-platform:
         condition: service_healthy
       redis-platform:
+        condition: service_healthy
+      redis-webhook:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - unthread-integration-network
+
+  webhook-server:
+    image: wgtechlabs/unthread-webhook-server:latest
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis-webhook:6379
+      TARGET_PLATFORM: whatsapp
+    ports:
+      - "3001:3000"
+    depends_on:
+      redis-webhook:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -57,9 +76,27 @@ services:
     networks:
       - unthread-integration-network
 
+  redis-webhook:
+    image: redis:8-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_webhook_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    networks:
+      - unthread-integration-network
+
 volumes:
   postgres_data:
   redis_platform_data:
+  redis_webhook_data:
 
 networks:
   unthread-integration-network:

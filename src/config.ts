@@ -40,4 +40,9 @@ export const config = {
     postgres: parsePostgresUrl(requireEnv("POSTGRES_URL")),
     redisUrl: optionalEnv("REDIS_URL", ""),
   },
+
+  webhook: {
+    redisUrl: optionalEnv("WEBHOOK_REDIS_URL", ""),
+    queueName: optionalEnv("WEBHOOK_QUEUE_NAME", "unthread-events"),
+  },
 } as const;
