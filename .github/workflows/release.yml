@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create release
+        id: release
+        uses: wgtechlabs/release-build-flow-action@v1.6.0
+        with:
+          # Use GH_PAT to allow downstream release-triggered workflows.
+          # Falls back to github.token if GH_PAT is not set.
+          github-token: ${{ secrets.GH_PAT != '' && secrets.GH_PAT || github.token }}
+          commit-convention: clean-commit
+
+      - name: Release summary
+        if: steps.release.outputs.version-bump-type != 'none'
+        run: |
+          echo "Version: ${{ steps.release.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tag: ${{ steps.release.outputs.version-tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: ${{ steps.release.outputs.release-url }}" >> "$GITHUB_STEP_SUMMARY"
