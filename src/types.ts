@@ -32,23 +32,6 @@ export interface UnthreadMessage {
   type: string;
 }
 
-// Unthread webhook event payload
-export interface UnthreadWebhookEvent {
-  type: string;
-  sourcePlatform?: string;
-  targetPlatform?: string;
-  data: {
-    id: string;
-    conversationId?: string;
-    body?: string;
-    content?: string;
-    text?: string;
-    customerId?: string;
-    type?: string;
-    [key: string]: unknown;
-  };
-}
-
 // Unthread queued event payload from unthread-webhook-server
 export interface UnthreadQueuedEvent {
   platform?: string;
