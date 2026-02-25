@@ -24,18 +24,18 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     LogEngine.debug("Customer resolved", { customerId: customer.customerId, phone });
 
     // 2. Get or create active conversation
-    const conversationId = await resolveConversation(customer);
-    LogEngine.debug("Conversation resolved", { conversationId });
-
-    // 3. Add message to conversation on behalf of the customer
     const cleanPhone = phone.replace(/[^0-9]/g, "");
     const dummyEmail = `${cleanPhone}@whatsapp.user`;
     const senderName = profileName || phone;
+    const onBehalfOf = { email: dummyEmail, name: senderName };
 
-    await unthread.addMessage(conversationId, body, {
-      email: dummyEmail,
-      name: senderName,
-    });
+    const { conversationId, isNew } = await resolveConversation(customer, body, onBehalfOf);
+    LogEngine.debug("Conversation resolved", { conversationId, isNew });
+
+    // 3. If conversation already existed, add message separately
+    if (!isNew) {
+      await unthread.addMessage(conversationId, body, onBehalfOf);
+    }
 
     LogEngine.info("Message forwarded to Unthread", { conversationId });
 

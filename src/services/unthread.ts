@@ -65,12 +65,19 @@ export async function createCustomer(
 export async function createConversation(
   customerId: string,
   title: string,
+  initialMessage: string,
+  onBehalfOf: { email: string; name: string },
 ): Promise<UnthreadConversation> {
   return request<UnthreadConversation>("POST", "/conversations", {
     customerId,
     title,
+    body: initialMessage,
     status: "open",
     channel: "whatsapp",
+    onBehalfOf: {
+      email: onBehalfOf.email,
+      name: onBehalfOf.name,
+    },
   });
 }
 

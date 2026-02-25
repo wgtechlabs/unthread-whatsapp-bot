@@ -61,29 +61,31 @@ export async function resolveCustomer(
 // Get or create an active conversation for a customer
 export async function resolveConversation(
   mapping: CustomerMapping,
-): Promise<string> {
+  initialMessage: string,
+  onBehalfOf: { email: string; name: string },
+): Promise<{ conversationId: string; isNew: boolean }> {
   if (mapping.conversationId) {
     // Check if conversation is still open
     try {
       const convo = await unthread.getConversation(mapping.conversationId);
       if (convo.status === "open" || convo.status === "waiting") {
-        return mapping.conversationId;
+        return { conversationId: mapping.conversationId, isNew: false };
       }
     } catch {
       // Conversation not found or closed, fall through to create new one
     }
   }
 
-  // Create a new conversation
+  // Create a new conversation with the initial message
   const title = `WhatsApp: ${mapping.profileName || mapping.phone}`;
-  const convo = await unthread.createConversation(mapping.customerId, title);
+  const convo = await unthread.createConversation(mapping.customerId, title, initialMessage, onBehalfOf);
 
   // Persist updated mapping and reverse index
   mapping.conversationId = convo.id;
   await storage().setNamespaced(NS_PHONE, mapping.phone, mapping);
   await storage().setNamespaced(NS_CONVO, convo.id, mapping.phone);
 
-  return convo.id;
+  return { conversationId: convo.id, isNew: true };
 }
 
 // Look up phone number by conversation ID (for outbound agent replies)
