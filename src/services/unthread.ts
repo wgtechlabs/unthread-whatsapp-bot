@@ -7,7 +7,7 @@ import type {
 
 const headers = {
   "Content-Type": "application/json",
-  "X-Api-Key": config.unthread.apiKey,
+  "X-API-KEY": config.unthread.apiKey,
 };
 
 async function request<T>(
@@ -69,11 +69,12 @@ export async function createConversation(
   onBehalfOf: { email: string; name: string },
 ): Promise<UnthreadConversation> {
   return request<UnthreadConversation>("POST", "/conversations", {
-    customerId,
+    type: "slack",
     title,
-    body: initialMessage,
+    markdown: initialMessage,
     status: "open",
-    channel: "whatsapp",
+    channelId: config.unthread.channelId,
+    customerId,
     onBehalfOf: {
       email: onBehalfOf.email,
       name: onBehalfOf.name,
@@ -84,15 +85,17 @@ export async function createConversation(
 // Add a message to an existing conversation on behalf of the customer
 export async function addMessage(
   conversationId: string,
-  body: string,
+  message: string,
   onBehalfOf: { email: string; name: string },
 ): Promise<UnthreadMessage> {
   return request<UnthreadMessage>(
     "POST",
     `/conversations/${conversationId}/messages`,
     {
-      body,
-      type: "customer",
+      body: {
+        type: "markdown",
+        value: message,
+      },
       onBehalfOf: {
         email: onBehalfOf.email,
         name: onBehalfOf.name,

@@ -33,6 +33,7 @@ export const config = {
   unthread: {
     apiKey: requireEnv("UNTHREAD_API_KEY"),
     apiUrl: optionalEnv("UNTHREAD_API_URL", "https://api.unthread.io/api"),
+    channelId: requireEnv("UNTHREAD_SLACK_CHANNEL_ID"),
     webhookSecret: optionalEnv("UNTHREAD_WEBHOOK_SECRET", ""),
   },
 
