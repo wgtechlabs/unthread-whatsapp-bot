@@ -42,7 +42,9 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     // Respond with empty TwiML (no auto-reply, let Unthread handle it)
     res.type("text/xml").send("<Response></Response>");
   } catch (error) {
-    LogEngine.error("Error processing incoming WhatsApp message", { error });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    LogEngine.error("Error processing incoming WhatsApp message", { error: errMsg, stack: errStack });
     res.type("text/xml").send("<Response></Response>");
   }
 });
