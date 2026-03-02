@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.0.4] - 2026-03-02
+
+### Changed
+
+- enhance API request logging and error handling
+- enhance error handling for Twilio WhatsApp message sending
+- enhance conversation handling and recovery logic
+- add *.http to .gitignore to exclude HTTP files
+
 ## [1.0.3] - 2026-02-25
 
 ### Changed
