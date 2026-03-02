@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.0.5] - 2026-03-02
+
+### Changed
+
+- enhance customer resolution with caching
+
 ## [1.0.4] - 2026-03-02
 
 ### Changed

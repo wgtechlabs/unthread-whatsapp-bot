@@ -1,6 +1,6 @@
 {
   "name": "unthread-whatsapp-bot",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "WhatsApp bot integration for Unthread customer support via Twilio",
   "module": "src/index.ts",
   "type": "module",
