@@ -3,6 +3,10 @@ import type { UnthreadQueuedEvent } from "../types";
 import { findPhoneByConversationId } from "./customer-store";
 import { sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
 
+// Twilio WhatsApp error codes
+const TWILIO_ERR_SANDBOX_EXPIRED = 63015;
+const TWILIO_ERR_OUTSIDE_24H_WINDOW = 63016;
+
 function normalize(str: unknown): string {
   return typeof str === "string" ? str.trim().toLowerCase() : "";
 }
@@ -71,6 +75,32 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
     return;
   }
 
-  await sendWhatsAppMessage(toWhatsAppFormat(phone), message);
-  LogEngine.info("Agent reply sent to WhatsApp", { phone, conversationId });
+  try {
+    await sendWhatsAppMessage(toWhatsAppFormat(phone), message);
+    LogEngine.info("Agent reply sent to WhatsApp", { phone, conversationId });
+  } catch (err: unknown) {
+    const twilioCode = (err as { code?: number }).code;
+    const twilioMessage = (err as { message?: string }).message ?? "Unknown error";
+
+    if (twilioCode === TWILIO_ERR_SANDBOX_EXPIRED) {
+      LogEngine.error("Twilio sandbox session expired — user must re-join the sandbox", {
+        phone,
+        conversationId,
+        twilioCode,
+      });
+    } else if (twilioCode === TWILIO_ERR_OUTSIDE_24H_WINDOW) {
+      LogEngine.error("Outside 24-hour messaging window — template message required", {
+        phone,
+        conversationId,
+        twilioCode,
+      });
+    } else {
+      LogEngine.error("Failed to send WhatsApp message via Twilio", {
+        phone,
+        conversationId,
+        twilioCode,
+        error: twilioMessage,
+      });
+    }
+  }
 }
