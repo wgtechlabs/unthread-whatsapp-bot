@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import express from "express";
 import { NuvexClient } from "@wgtechlabs/nuvex";
 import type { NuvexConfig } from "@wgtechlabs/nuvex";
@@ -6,6 +8,10 @@ import { config } from "./config";
 import { setStorage } from "./services/customer-store";
 import { twilioWebhookRouter } from "./routes/twilio-webhook";
 import { UnthreadWebhookConsumer } from "./services/unthread-webhook-consumer";
+
+// Read bot version from package.json
+const pkg = JSON.parse(readFileSync(resolve(import.meta.dir, "../package.json"), "utf-8"));
+const BOT_VERSION: string = pkg.version;
 
 async function bootstrap() {
   let webhookConsumer: UnthreadWebhookConsumer | null = null;
@@ -41,13 +47,13 @@ async function bootstrap() {
 
   app.get("/health", async (_req, res) => {
     const health = await storage.healthCheck();
-    res.json({ status: "ok", storage: health, timestamp: new Date().toISOString() });
+    res.json({ status: "ok", version: BOT_VERSION, storage: health, timestamp: new Date().toISOString() });
   });
 
   app.use("/webhooks/twilio", twilioWebhookRouter);
 
   app.listen(config.port, () => {
-    LogEngine.log(`Unthread WhatsApp Bot running on port ${config.port}`);
+    LogEngine.log(`Unthread WhatsApp Bot v${BOT_VERSION} running on port ${config.port}`);
     LogEngine.info("Twilio webhook:   POST /webhooks/twilio");
     LogEngine.info("Health check:     GET  /health");
   });
