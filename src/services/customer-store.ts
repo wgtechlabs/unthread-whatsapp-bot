@@ -1,4 +1,5 @@
 import type { NuvexClient } from "@wgtechlabs/nuvex";
+import { LogEngine } from "@wgtechlabs/log-engine";
 import type { CustomerMapping } from "../types";
 import * as unthread from "./unthread";
 
@@ -34,13 +35,22 @@ export async function resolveCustomer(
   const existingCustomer = await unthread.findCustomerByEmail(dummyEmail);
 
   if (existingCustomer) {
+    // Try to recover existing open conversation context from Unthread
+    const openConvo = await unthread.findOpenConversationByCustomer(existingCustomer.id);
+
     const mapping: CustomerMapping = {
       phone,
       customerId: existingCustomer.id,
-      conversationId: null,
+      conversationId: openConvo?.id ?? null,
       profileName,
     };
     await storage().setNamespaced(NS_PHONE, phone, mapping);
+
+    // Restore reverse index so outbound agent replies can find the phone number
+    if (openConvo) {
+      await storage().setNamespaced(NS_CONVO, openConvo.id, phone);
+    }
+
     return mapping;
   }
 
@@ -64,19 +74,31 @@ export async function resolveConversation(
   initialMessage: string,
   onBehalfOf: { email: string; name: string },
 ): Promise<{ conversationId: string; isNew: boolean }> {
+  // 1. Try the stored conversationId first
   if (mapping.conversationId) {
-    // Check if conversation is still open
     try {
       const convo = await unthread.getConversation(mapping.conversationId);
       if (convo.status === "open" || convo.status === "waiting") {
         return { conversationId: mapping.conversationId, isNew: false };
       }
-    } catch {
-      // Conversation not found or closed, fall through to create new one
+    } catch (err) {
+      LogEngine.warn("Failed to fetch stored conversation, will search for open ones", {
+        conversationId: mapping.conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
-  // Create a new conversation with the initial message
+  // 2. Fallback: search for any open conversation for this customer
+  const openConvo = await unthread.findOpenConversationByCustomer(mapping.customerId);
+  if (openConvo) {
+    mapping.conversationId = openConvo.id;
+    await storage().setNamespaced(NS_PHONE, mapping.phone, mapping);
+    await storage().setNamespaced(NS_CONVO, openConvo.id, mapping.phone);
+    return { conversationId: openConvo.id, isNew: false };
+  }
+
+  // 3. No open conversations found — create a new one
   const title = `WhatsApp: ${mapping.profileName || mapping.phone}`;
   const convo = await unthread.createConversation(mapping.customerId, title, initialMessage, onBehalfOf);
 
