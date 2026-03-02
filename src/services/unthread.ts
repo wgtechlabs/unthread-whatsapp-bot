@@ -1,3 +1,4 @@
+import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
 import type {
   UnthreadCustomer,
@@ -16,6 +17,9 @@ async function request<T>(
   body?: unknown,
 ): Promise<T> {
   const url = `${config.unthread.apiUrl}${path}`;
+
+  LogEngine.debug(`Unthread API ${method} ${path}`, { payload: body });
+
   const res = await fetch(url, {
     method,
     headers,
@@ -27,7 +31,9 @@ async function request<T>(
     throw new Error(`Unthread API ${method} ${path} failed (${res.status}): ${text}`);
   }
 
-  return res.json() as Promise<T>;
+  const data = await res.json() as T;
+  LogEngine.debug(`Unthread API ${method} ${path} response OK`);
+  return data;
 }
 
 // Search for existing customer by email
@@ -40,7 +46,11 @@ export async function findCustomerByEmail(
       `/customers?email=${encodeURIComponent(email)}`,
     );
     return customers.length > 0 ? customers[0] : null;
-  } catch {
+  } catch (err) {
+    LogEngine.warn("Failed to find customer by email", {
+      email,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
@@ -119,4 +129,29 @@ export async function getCustomer(
   customerId: string,
 ): Promise<UnthreadCustomer> {
   return request<UnthreadCustomer>("GET", `/customers/${customerId}`);
+}
+
+// Find the most recent open/waiting conversation for a customer
+export async function findOpenConversationByCustomer(
+  customerId: string,
+): Promise<UnthreadConversation | null> {
+  try {
+    const conversations = await request<UnthreadConversation[]>(
+      "GET",
+      `/conversations?customerId=${encodeURIComponent(customerId)}&status=open`,
+    );
+
+    // Defensive client-side filter in case the API ignores the status param
+    const open = conversations.find(
+      (c) => c.status === "open" || c.status === "waiting",
+    );
+
+    return open ?? null;
+  } catch (err) {
+    LogEngine.warn("Failed to find open conversation for customer", {
+      customerId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 }
