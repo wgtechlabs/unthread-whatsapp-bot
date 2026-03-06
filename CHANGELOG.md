@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.1.0] - 2026-03-06
+
+### Added
+
+- add whatsapp session expiry warning system
+- add customer notification helpers
+
+### Changed
+
+- send system messages for ticket and status events
+- expose friendlyId from resolveConversation
+- add friendlyId to UnthreadConversation
+- ignore .contributerc.json
+
 ## [1.0.5] - 2026-03-02
 
 ### Changed
