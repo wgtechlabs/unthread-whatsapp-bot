@@ -23,6 +23,7 @@ export interface UnthreadConversation {
   customerId: string;
   status: string;
   title?: string;
+  friendlyId?: string;
 }
 
 export interface UnthreadMessage {
@@ -47,6 +48,9 @@ export interface UnthreadQueuedEvent {
     text?: string;
     customerId?: string;
     type?: string;
+    status?: string;
+    previousStatus?: string;
+    friendlyId?: string;
     [key: string]: unknown;
   };
 }
