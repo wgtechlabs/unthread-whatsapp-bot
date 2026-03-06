@@ -39,6 +39,13 @@ const templates = {
     "",
     "Ticket #{{ticketNumber}} is now active again. An agent will follow up shortly.",
   ].join("\n"),
+
+  ticket_expiry_warning: [
+    "*Ticket Update*",
+    "",
+    "Ticket #{{ticketNumber}} — Your session is about to expire.",
+    "If you still need assistance, please reply to keep your ticket active. Otherwise, your ticket will be placed on hold.",
+  ].join("\n"),
 } as const;
 
 type TemplateKey = keyof typeof templates;
@@ -70,6 +77,15 @@ export async function sendTicketCreatedMessage(
 ): Promise<boolean> {
   const safe = sanitizeTicketNumber(ticketNumber);
   const message = renderTemplate("ticket_created", { ticketNumber: safe });
+  return sendSystemMessage(phone, message);
+}
+
+export async function sendExpiryWarningMessage(
+  phone: string,
+  ticketNumber: string,
+): Promise<boolean> {
+  const safe = sanitizeTicketNumber(ticketNumber);
+  const message = renderTemplate("ticket_expiry_warning", { ticketNumber: safe });
   return sendSystemMessage(phone, message);
 }
 

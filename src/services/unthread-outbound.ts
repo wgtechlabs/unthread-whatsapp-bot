@@ -3,6 +3,7 @@ import type { UnthreadQueuedEvent } from "../types";
 import { findPhoneByConversationId } from "./customer-store";
 import { sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
 import { sendStatusChangeMessage, resolveTicketNumber } from "./system-messages";
+import { clearSession } from "./session-timer";
 import * as unthread from "./unthread";
 
 // Twilio WhatsApp error codes
@@ -85,6 +86,11 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
       });
       ticketNumber = resolveTicketNumber(undefined, conversationId);
     }
+  }
+
+  // Clear session timer when ticket is closed (no more expiry warnings needed)
+  if (newStatus === "closed" || newStatus === "resolved") {
+    clearSession(conversationId);
   }
 
   const previousStatus = normalize(event.data.previousStatus);
