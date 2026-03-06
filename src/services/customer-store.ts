@@ -107,7 +107,7 @@ export async function resolveConversation(
   mapping: CustomerMapping,
   initialMessage: string,
   onBehalfOf: { email: string; name: string },
-): Promise<{ conversationId: string; isNew: boolean }> {
+): Promise<{ conversationId: string; isNew: boolean; friendlyId?: string }> {
   // 1. Try the stored conversationId first
   if (mapping.conversationId) {
     try {
@@ -155,7 +155,7 @@ export async function resolveConversation(
   mapping.conversationId = convo.id;
   await persistMapping(mapping);
 
-  return { conversationId: convo.id, isNew: true };
+  return { conversationId: convo.id, isNew: true, friendlyId: convo.friendlyId };
 }
 
 // Look up phone number by conversation ID (for outbound agent replies)
