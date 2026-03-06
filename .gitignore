@@ -5,3 +5,4 @@ dist/
 .claude/
 package-lock.json
 *.http
+.contributerc.json
