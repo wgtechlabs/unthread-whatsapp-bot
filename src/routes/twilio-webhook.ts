@@ -5,6 +5,7 @@ import type { TwilioIncomingMessage } from "../types";
 import { extractPhone } from "../services/twilio";
 import { resolveCustomer, resolveConversation } from "../services/customer-store";
 import * as unthread from "../services/unthread";
+import { sendTicketCreatedMessage, resolveTicketNumber } from "../services/system-messages";
 
 export const twilioWebhookRouter = Router();
 
@@ -29,12 +30,25 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     const senderName = profileName || phone;
     const onBehalfOf = { email: dummyEmail, name: senderName };
 
-    const { conversationId, isNew } = await resolveConversation(customer, body, onBehalfOf);
+    const { conversationId, isNew, friendlyId } = await resolveConversation(customer, body, onBehalfOf);
     LogEngine.debug("Conversation resolved", { conversationId, isNew });
 
     // 3. If conversation already existed, add message separately
     if (!isNew) {
       await unthread.addMessage(conversationId, body, onBehalfOf);
+    }
+
+    // 4. If new ticket was created, send ticket confirmation to customer
+    if (isNew) {
+      try {
+        const ticketNumber = resolveTicketNumber(friendlyId, conversationId);
+        await sendTicketCreatedMessage(phone, ticketNumber);
+      } catch (err) {
+        LogEngine.warn("Failed to send ticket created notification", {
+          conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     LogEngine.info("Message forwarded to Unthread", { conversationId });

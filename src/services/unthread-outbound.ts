@@ -2,6 +2,8 @@ import { LogEngine } from "@wgtechlabs/log-engine";
 import type { UnthreadQueuedEvent } from "../types";
 import { findPhoneByConversationId } from "./customer-store";
 import { sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
+import { sendStatusChangeMessage, resolveTicketNumber } from "./system-messages";
+import * as unthread from "./unthread";
 
 // Twilio WhatsApp error codes
 const TWILIO_ERR_SANDBOX_EXPIRED = 63015;
@@ -48,7 +50,57 @@ function isTargetWhatsApp(event: UnthreadQueuedEvent): boolean {
   return !targetPlatform || targetPlatform === "whatsapp";
 }
 
+function isConversationUpdateEvent(event: UnthreadQueuedEvent): boolean {
+  const type = normalize(event.type);
+  return type === "conversation_updated" || type === "conversation.updated";
+}
+
+async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<void> {
+  const conversationId = extractConversationId(event);
+  const newStatus = normalize(event.data.status);
+
+  if (!conversationId || !newStatus) {
+    LogEngine.debug("Skipping conversation_updated: missing conversationId or status");
+    return;
+  }
+
+  const phone = await findPhoneByConversationId(conversationId);
+  if (!phone) {
+    LogEngine.warn("No WhatsApp mapping found for conversation update", { conversationId });
+    return;
+  }
+
+  // Use friendlyId from event payload first, fall back to API call
+  let ticketNumber: string;
+  if (event.data.friendlyId) {
+    ticketNumber = resolveTicketNumber(event.data.friendlyId, conversationId);
+  } else {
+    try {
+      const conversation = await unthread.getConversation(conversationId);
+      ticketNumber = resolveTicketNumber(conversation.friendlyId, conversationId);
+    } catch (err) {
+      LogEngine.warn("Could not fetch conversation details for status notification", {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      ticketNumber = resolveTicketNumber(undefined, conversationId);
+    }
+  }
+
+  const previousStatus = normalize(event.data.previousStatus);
+  const sent = await sendStatusChangeMessage(phone, ticketNumber, newStatus, previousStatus || undefined);
+
+  if (sent) {
+    LogEngine.info("Status change notification sent", { phone, conversationId, newStatus, ticketNumber });
+  }
+}
+
 export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): Promise<void> {
+  if (isConversationUpdateEvent(event)) {
+    await processConversationUpdate(event);
+    return;
+  }
+
   if (!isMessageEvent(event)) {
     return;
   }
