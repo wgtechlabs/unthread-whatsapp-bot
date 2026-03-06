@@ -6,7 +6,6 @@ import { extractPhone } from "../services/twilio";
 import { resolveCustomer, resolveConversation } from "../services/customer-store";
 import * as unthread from "../services/unthread";
 import { sendTicketCreatedMessage, resolveTicketNumber } from "../services/system-messages";
-import { trackCustomerMessage } from "../services/session-timer";
 
 export const twilioWebhookRouter = Router();
 
@@ -51,9 +50,6 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
         });
       }
     }
-
-    // 5. Track customer message for session expiry warning (resets 24h window timer)
-    trackCustomerMessage(conversationId, phone, ticketNumber);
 
     LogEngine.info("Message forwarded to Unthread", { conversationId });
 

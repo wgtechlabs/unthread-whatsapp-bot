@@ -8,7 +8,6 @@ import { config } from "./config";
 import { setStorage } from "./services/customer-store";
 import { twilioWebhookRouter } from "./routes/twilio-webhook";
 import { UnthreadWebhookConsumer } from "./services/unthread-webhook-consumer";
-import { startSessionTimer, stopSessionTimer } from "./services/session-timer";
 
 // Read bot version from package.json
 const pkg = JSON.parse(readFileSync(resolve(import.meta.dir, "../package.json"), "utf-8"));
@@ -41,9 +40,6 @@ async function bootstrap() {
     });
   }
 
-  // Start session expiry timer (sends pre-expiry warnings before 24h WhatsApp window closes)
-  startSessionTimer();
-
   const app = express();
 
   app.use(express.urlencoded({ extended: false }));
@@ -64,7 +60,6 @@ async function bootstrap() {
 
   const shutdown = async () => {
     try {
-      stopSessionTimer();
       if (webhookConsumer) {
         await webhookConsumer.stop();
       }
