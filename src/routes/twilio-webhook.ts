@@ -38,23 +38,23 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
       await unthread.addMessage(conversationId, body, onBehalfOf);
     }
 
+    LogEngine.info("Message forwarded to Unthread", { conversationId });
+
+    // Respond with empty TwiML first to close the Twilio session.
+    // System messages must be sent AFTER the response so the REST API call
+    // doesn't conflict with the active webhook session.
+    res.type("text/xml").send("<Response></Response>");
+
     // 4. If new ticket was created, send ticket confirmation to customer
-    const ticketNumber = resolveTicketNumber(friendlyId, conversationId);
     if (isNew) {
-      try {
-        await sendTicketCreatedMessage(phone, ticketNumber);
-      } catch (err) {
+      const ticketNumber = resolveTicketNumber(friendlyId, conversationId);
+      sendTicketCreatedMessage(phone, ticketNumber).catch((err) => {
         LogEngine.warn("Failed to send ticket created notification", {
           conversationId,
           error: err instanceof Error ? err.message : String(err),
         });
-      }
+      });
     }
-
-    LogEngine.info("Message forwarded to Unthread", { conversationId });
-
-    // Respond with empty TwiML (no auto-reply, let Unthread handle it)
-    res.type("text/xml").send("<Response></Response>");
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
