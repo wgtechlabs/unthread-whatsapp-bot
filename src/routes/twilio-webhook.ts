@@ -5,16 +5,7 @@ import type { TwilioIncomingMessage } from "../types";
 import { extractPhone } from "../services/twilio";
 import { resolveCustomer, resolveConversation } from "../services/customer-store";
 import * as unthread from "../services/unthread";
-import { buildTicketCreatedMessage, resolveTicketNumber } from "../services/system-messages";
-
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
+import { sendTicketCreatedMessage, resolveTicketNumber } from "../services/system-messages";
 
 export const twilioWebhookRouter = Router();
 
@@ -47,18 +38,23 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
       await unthread.addMessage(conversationId, body, onBehalfOf);
     }
 
-    LogEngine.info("Message forwarded to Unthread", { conversationId });
-
-    // Respond with TwiML — include ticket creation notification inline for new tickets.
-    // Using TwiML <Message> is more reliable than a separate REST API call since it's
-    // delivered as a direct session reply with no additional auth or format concerns.
+    // 4. If new ticket was created, send ticket confirmation to customer
     const ticketNumber = resolveTicketNumber(friendlyId, conversationId);
     if (isNew) {
-      const notif = buildTicketCreatedMessage(ticketNumber);
-      res.type("text/xml").send(`<Response><Message><Body>${escapeXml(notif)}</Body></Message></Response>`);
-    } else {
-      res.type("text/xml").send("<Response></Response>");
+      try {
+        await sendTicketCreatedMessage(phone, ticketNumber);
+      } catch (err) {
+        LogEngine.warn("Failed to send ticket created notification", {
+          conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
+
+    LogEngine.info("Message forwarded to Unthread", { conversationId });
+
+    // Respond with empty TwiML (no auto-reply, let Unthread handle it)
+    res.type("text/xml").send("<Response></Response>");
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
