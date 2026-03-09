@@ -65,12 +65,16 @@ async function sendSystemMessage(phone: string, message: string): Promise<boolea
   }
 }
 
+export function buildTicketCreatedMessage(ticketNumber: string): string {
+  const safe = sanitizeTicketNumber(ticketNumber);
+  return renderTemplate("ticket_created", { ticketNumber: safe });
+}
+
 export async function sendTicketCreatedMessage(
   phone: string,
   ticketNumber: string,
 ): Promise<boolean> {
-  const safe = sanitizeTicketNumber(ticketNumber);
-  const message = renderTemplate("ticket_created", { ticketNumber: safe });
+  const message = buildTicketCreatedMessage(ticketNumber);
   return sendSystemMessage(phone, message);
 }
 
