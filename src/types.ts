@@ -62,3 +62,19 @@ export interface CustomerMapping {
   conversationId: string | null;
   profileName: string | null;
 }
+
+export interface WhatsAppCustomerRecord extends CustomerMapping {
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WhatsAppTicketRecord {
+  conversationId: string;
+  customerId: string;
+  phone: string;
+  friendlyId: string | null;
+  status: string | null;
+  profileName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
