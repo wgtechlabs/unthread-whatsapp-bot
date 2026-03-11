@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import express from "express";
 import { NuvexClient } from "@wgtechlabs/nuvex";
-import type { NuvexConfig } from "@wgtechlabs/nuvex";
+import type { NuvexConfig, StorageOptions } from "@wgtechlabs/nuvex";
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "./config";
 import { setStorage } from "./services/customer-store";
@@ -37,6 +37,17 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
     timestamp: new Date().toISOString(),
   };
 
+  const layerTests: Array<{
+    label: string;
+    layer?: "memory" | "redis" | "postgres";
+    readOptions?: StorageOptions;
+  }> = [
+    { label: "default" },
+    { label: "memory", layer: "memory", readOptions: { layer: "memory" as never } },
+    { label: "redis", layer: "redis", readOptions: { layer: "redis" as never } },
+    { label: "postgres", layer: "postgres", readOptions: { layer: "postgres" as never } },
+  ];
+
   try {
     const writeOk = await storage.set(diagnosticsKey, diagnosticsValue);
     LogEngine.info("Storage diagnostics: write test", { diagnosticsKey, writeOk });
@@ -55,6 +66,41 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
       diagnosticsKey,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+
+  for (const layerTest of layerTests) {
+    const layerKey = `${diagnosticsKey}:${layerTest.label}`;
+    try {
+      const writeOk = await storage.set(layerKey, {
+        ...diagnosticsValue,
+        layer: layerTest.label,
+      }, layerTest.layer ? { layer: layerTest.layer as never } : {});
+
+      const readValue = await storage.get<typeof diagnosticsValue & { layer: string }>(
+        layerKey,
+        layerTest.readOptions ?? {},
+      );
+
+      const deleteOk = await storage.delete(
+        layerKey,
+        layerTest.layer ? { layer: layerTest.layer as never } : {},
+      );
+
+      LogEngine.info("Storage diagnostics: layer roundtrip", {
+        layer: layerTest.label,
+        layerKey,
+        writeOk,
+        readOk: readValue !== null,
+        readValue,
+        deleteOk,
+      });
+    } catch (error) {
+      LogEngine.error("Storage diagnostics: layer roundtrip failed", {
+        layer: layerTest.label,
+        layerKey,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   try {
