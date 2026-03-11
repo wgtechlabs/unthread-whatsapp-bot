@@ -1,11 +1,18 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
 
-function sanitizeTicketNumber(value: string): string {
-  return value.replace(/[^a-zA-Z0-9\-_]/g, "");
+function sanitizeTicketNumber(value: unknown): string {
+  const normalized = typeof value === "string"
+    ? value
+    : typeof value === "number" || typeof value === "bigint"
+      ? String(value)
+      : "";
+
+  const sanitized = normalized.replace(/[^a-zA-Z0-9\-_]/g, "");
+  return sanitized || "unknown";
 }
 
-export function resolveTicketNumber(friendlyId?: string | null, conversationId?: string): string {
+export function resolveTicketNumber(friendlyId?: unknown, conversationId?: string): string {
   const raw = friendlyId || conversationId?.slice(0, 8) || "unknown";
   return sanitizeTicketNumber(raw);
 }

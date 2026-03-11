@@ -48,6 +48,8 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     // 4. If new ticket was created, send ticket confirmation to customer
     if (isNew) {
       const ticketNumber = resolveTicketNumber(friendlyId, conversationId);
+      LogEngine.debug("Sending ticket created notification", { conversationId, phone, ticketNumber });
+
       sendTicketCreatedMessage(phone, ticketNumber).catch((err) => {
         LogEngine.warn("Failed to send ticket created notification", {
           conversationId,
@@ -59,6 +61,9 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
     LogEngine.error("Error processing incoming WhatsApp message", { error: errMsg, stack: errStack });
-    res.type("text/xml").send("<Response></Response>");
+
+    if (!res.headersSent) {
+      res.type("text/xml").send("<Response></Response>");
+    }
   }
 });
