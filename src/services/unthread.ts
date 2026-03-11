@@ -11,6 +11,14 @@ const headers = {
   "X-API-KEY": config.unthread.apiKey,
 };
 
+function isReusableConversationStatus(status: string | undefined): boolean {
+  return status === "open"
+    || status === "waiting"
+    || status === "on_hold"
+    || status === "on-hold"
+    || status === "in_progress";
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -138,12 +146,12 @@ export async function findOpenConversationByCustomer(
   try {
     const conversations = await request<UnthreadConversation[]>(
       "GET",
-      `/conversations?customerId=${encodeURIComponent(customerId)}&status=open`,
+      `/conversations?customerId=${encodeURIComponent(customerId)}`,
     );
 
-    // Defensive client-side filter in case the API ignores the status param
+    // Reuse any active customer-facing conversation status.
     const open = conversations.find(
-      (c) => c.status === "open" || c.status === "waiting",
+      (c) => isReusableConversationStatus(c.status),
     );
 
     return open ?? null;
