@@ -4,6 +4,7 @@ import { findPhoneByConversationId } from "./customer-store";
 import { sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
 import { sendStatusChangeMessage, resolveTicketNumber } from "./system-messages";
 import * as unthread from "./unthread";
+import { updateTicketStatus } from "./whatsapp-store";
 
 // Twilio WhatsApp error codes
 const TWILIO_ERR_SANDBOX_EXPIRED = 63015;
@@ -147,6 +148,7 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
   }
 
   const sent = await sendStatusChangeMessage(phone, ticketNumber, newStatus, previousStatus || undefined);
+  await updateTicketStatus(conversationId, newStatus, typeof friendlyId === "string" ? friendlyId : null);
 
   if (sent) {
     LogEngine.info("Status change notification sent", { phone, conversationId, newStatus, ticketNumber });

@@ -39,6 +39,12 @@ const templates = {
     "If you have additional information, reply here and your ticket will be resumed.",
   ].join("\n"),
 
+  ticket_in_progress: [
+    "*Ticket In Progress*",
+    "",
+    "Ticket #{{ticketNumber}} is now in progress.",
+  ].join("\n"),
+
   ticket_resumed: [
     "*Ticket Resumed*",
     "",
@@ -107,7 +113,6 @@ export async function sendStatusChangeMessage(
       templateKey = "ticket_on_hold";
       break;
     case "open":
-    case "in_progress":
       // Distinguish "resumed from hold" vs generic reopen
       if (prevStatus === "on_hold" || prevStatus === "on-hold" || prevStatus === "waiting") {
         templateKey = "ticket_resumed";
@@ -119,6 +124,13 @@ export async function sendStatusChangeMessage(
           previousStatus,
         });
         return false;
+      }
+      break;
+    case "in_progress":
+      if (prevStatus === "on_hold" || prevStatus === "on-hold" || prevStatus === "waiting") {
+        templateKey = "ticket_resumed";
+      } else {
+        templateKey = "ticket_in_progress";
       }
       break;
     default:
