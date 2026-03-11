@@ -80,6 +80,24 @@ export function initializeWhatsAppStore(client: NuvexClient): void {
   _storage = client;
 }
 
+async function verifyNamespacedRecord<T>(
+  namespace: string,
+  key: string,
+  validator: (value: unknown) => value is T,
+  label: string,
+): Promise<void> {
+  const persisted = await storage().getNamespaced(namespace, key, { skipCache: true });
+  if (!validator(persisted)) {
+    LogEngine.error("WhatsApp store persistence verification failed", {
+      label,
+      namespace,
+      key,
+      persisted,
+    });
+    throw new Error(`Persistence verification failed for ${label}`);
+  }
+}
+
 export async function storeCustomer(record: Omit<WhatsAppCustomerRecord, "createdAt" | "updatedAt"> & Partial<Pick<WhatsAppCustomerRecord, "createdAt" | "updatedAt">>): Promise<WhatsAppCustomerRecord> {
   const timestamp = nowIso();
   const normalized: WhatsAppCustomerRecord = {
@@ -88,9 +106,23 @@ export async function storeCustomer(record: Omit<WhatsAppCustomerRecord, "create
     updatedAt: timestamp,
   };
 
-  await Promise.all([
+  const results = await Promise.all([
     storage().setNamespaced(NS_CUSTOMER_PHONE, normalized.phone, normalized),
     storage().setNamespaced(NS_CUSTOMER_ID, normalized.customerId, normalized),
+  ]);
+
+  if (!results.every(Boolean)) {
+    LogEngine.error("Failed to persist WhatsApp customer record", {
+      phone: normalized.phone,
+      customerId: normalized.customerId,
+      results,
+    });
+    throw new Error("Failed to persist WhatsApp customer record");
+  }
+
+  await Promise.all([
+    verifyNamespacedRecord(NS_CUSTOMER_PHONE, normalized.phone, isValidCustomerRecord, "customer-by-phone"),
+    verifyNamespacedRecord(NS_CUSTOMER_ID, normalized.customerId, isValidCustomerRecord, "customer-by-id"),
   ]);
 
   primeCustomerCaches(normalized);
@@ -107,6 +139,8 @@ export async function getCustomerByPhone(phone: string): Promise<WhatsAppCustome
   if (!isValidCustomerRecord(stored)) {
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp customer record by phone", { phone, raw: stored });
+    } else {
+      LogEngine.warn("WhatsApp customer record not found in storage", { phone });
     }
     return null;
   }
@@ -125,6 +159,8 @@ export async function getCustomerById(customerId: string): Promise<WhatsAppCusto
   if (!isValidCustomerRecord(stored)) {
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp customer record by id", { customerId, raw: stored });
+    } else {
+      LogEngine.warn("WhatsApp customer record not found by id", { customerId });
     }
     return null;
   }
@@ -152,7 +188,24 @@ export async function storeTicket(record: Omit<WhatsAppTicketRecord, "createdAt"
     writes.push(storage().setNamespaced(NS_TICKET_FRIENDLY, normalized.friendlyId, normalized));
   }
 
-  await Promise.all(writes);
+  const results = await Promise.all(writes);
+  if (!results.every(Boolean)) {
+    LogEngine.error("Failed to persist WhatsApp ticket record", {
+      conversationId: normalized.conversationId,
+      friendlyId: normalized.friendlyId,
+      results,
+    });
+    throw new Error("Failed to persist WhatsApp ticket record");
+  }
+
+  await Promise.all([
+    verifyNamespacedRecord(NS_TICKET_CONVERSATION, normalized.conversationId, isValidTicketRecord, "ticket-by-conversation"),
+    verifyNamespacedRecord(NS_CONVERSATION_PHONE, normalized.conversationId, isNonEmptyString, "conversation-phone-index"),
+    normalized.friendlyId
+      ? verifyNamespacedRecord(NS_TICKET_FRIENDLY, normalized.friendlyId, isValidTicketRecord, "ticket-by-friendly")
+      : Promise.resolve(),
+  ]);
+
   primeTicketCaches(normalized);
   return normalized;
 }
@@ -167,6 +220,8 @@ export async function getTicketByConversationId(conversationId: string): Promise
   if (!isValidTicketRecord(stored)) {
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp ticket record by conversation", { conversationId, raw: stored });
+    } else {
+      LogEngine.warn("WhatsApp ticket record not found by conversation", { conversationId });
     }
     return null;
   }
@@ -185,6 +240,8 @@ export async function getTicketByFriendlyId(friendlyId: string): Promise<WhatsAp
   if (!isValidTicketRecord(stored)) {
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp ticket record by friendly id", { friendlyId, raw: stored });
+    } else {
+      LogEngine.warn("WhatsApp ticket record not found by friendly id", { friendlyId });
     }
     return null;
   }
@@ -204,6 +261,8 @@ export async function getPhoneByConversationId(conversationId: string): Promise<
     phoneByConversationCache.set(conversationId, stored);
     return stored;
   }
+
+  LogEngine.warn("WhatsApp conversation phone index not found", { conversationId });
 
   const ticket = await getTicketByConversationId(conversationId);
   if (ticket) {
