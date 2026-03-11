@@ -15,7 +15,7 @@ const BOT_VERSION: string = pkg.version;
 
 async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
   LogEngine.info("Storage diagnostics: configuration", {
-    hasPostgres: true,
+    hasPostgres: Boolean(config.storage.postgres.host && config.storage.postgres.database),
     postgresHost: config.storage.postgres.host,
     postgresDatabase: config.storage.postgres.database,
     hasRedis: Boolean(config.storage.redisUrl),
@@ -36,6 +36,7 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
     botVersion: BOT_VERSION,
     timestamp: new Date().toISOString(),
   };
+  const diagnosticsWriteOptions: StorageOptions = { ttl: 60 };
 
   const layerTests: Array<{
     label: string;
@@ -48,9 +49,10 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
     { label: "postgres", layer: "postgres", readOptions: { layer: "postgres" as never } },
   ];
 
+  let defaultWriteOk = false;
   try {
-    const writeOk = await storage.set(diagnosticsKey, diagnosticsValue);
-    LogEngine.info("Storage diagnostics: write test", { diagnosticsKey, writeOk });
+    defaultWriteOk = await storage.set(diagnosticsKey, diagnosticsValue, diagnosticsWriteOptions);
+    LogEngine.info("Storage diagnostics: write test", { diagnosticsKey, writeOk: defaultWriteOk });
 
     const persistentRead = await storage.get<typeof diagnosticsValue>(diagnosticsKey, { skipCache: true });
     LogEngine.info("Storage diagnostics: persistent read test", {
@@ -58,41 +60,41 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
       readOk: persistentRead !== null,
       value: persistentRead,
     });
-
-    const deleteOk = await storage.delete(diagnosticsKey);
-    LogEngine.info("Storage diagnostics: delete test", { diagnosticsKey, deleteOk });
   } catch (error) {
     LogEngine.error("Storage diagnostics: roundtrip failed", {
       diagnosticsKey,
       error: error instanceof Error ? error.message : String(error),
     });
+  } finally {
+    if (defaultWriteOk) {
+      const deleteOk = await storage.delete(diagnosticsKey);
+      LogEngine.info("Storage diagnostics: delete test", { diagnosticsKey, deleteOk });
+    }
   }
 
   for (const layerTest of layerTests) {
     const layerKey = `${diagnosticsKey}:${layerTest.label}`;
+    const layerWriteOptions = layerTest.layer
+      ? { layer: layerTest.layer as never, ttl: 60 }
+      : diagnosticsWriteOptions;
+    let layerWriteOk = false;
     try {
-      const writeOk = await storage.set(layerKey, {
+      layerWriteOk = await storage.set(layerKey, {
         ...diagnosticsValue,
         layer: layerTest.label,
-      }, layerTest.layer ? { layer: layerTest.layer as never } : {});
+      }, layerWriteOptions);
 
       const readValue = await storage.get<typeof diagnosticsValue & { layer: string }>(
         layerKey,
         layerTest.readOptions ?? {},
       );
 
-      const deleteOk = await storage.delete(
-        layerKey,
-        layerTest.layer ? { layer: layerTest.layer as never } : {},
-      );
-
       LogEngine.info("Storage diagnostics: layer roundtrip", {
         layer: layerTest.label,
         layerKey,
-        writeOk,
+        writeOk: layerWriteOk,
         readOk: readValue !== null,
         readValue,
-        deleteOk,
       });
     } catch (error) {
       LogEngine.error("Storage diagnostics: layer roundtrip failed", {
@@ -100,6 +102,19 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
         layerKey,
         error: error instanceof Error ? error.message : String(error),
       });
+    } finally {
+      if (layerWriteOk) {
+        const deleteOk = await storage.delete(
+          layerKey,
+          layerTest.layer ? { layer: layerTest.layer as never } : {},
+        );
+
+        LogEngine.info("Storage diagnostics: layer cleanup", {
+          layer: layerTest.label,
+          layerKey,
+          deleteOk,
+        });
+      }
     }
   }
 
@@ -128,7 +143,11 @@ async function bootstrap() {
   const storage = await NuvexClient.initialize(nuvexConfig);
   setStorage(storage);
   LogEngine.info("Storage: Nuvex initialized");
-  await logStorageDiagnostics(storage);
+  logStorageDiagnostics(storage).catch((err) => {
+    LogEngine.error("Storage diagnostics failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   if (config.webhook.redisUrl) {
     webhookConsumer = new UnthreadWebhookConsumer({
