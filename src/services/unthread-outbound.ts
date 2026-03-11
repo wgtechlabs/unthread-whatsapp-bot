@@ -13,16 +13,60 @@ function normalize(str: unknown): string {
   return typeof str === "string" ? str.trim().toLowerCase() : "";
 }
 
+function eventDataRecord(event: UnthreadQueuedEvent): Record<string, unknown> {
+  return event.data as Record<string, unknown>;
+}
+
+function conversationRecord(event: UnthreadQueuedEvent): Record<string, unknown> {
+  const data = eventDataRecord(event);
+  const nested = data.conversation;
+  return nested && typeof nested === "object"
+    ? nested as Record<string, unknown>
+    : data;
+}
+
+function readString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function extractConversationId(event: UnthreadQueuedEvent): string {
-  const { data } = event;
-  const conversationId = data.conversationId ?? data.id;
-  return typeof conversationId === "string" ? conversationId.trim() : "";
+  const conversation = conversationRecord(event);
+  const data = eventDataRecord(event);
+
+  return readString(conversation, "conversationId")
+    || readString(conversation, "id")
+    || readString(data, "conversationId")
+    || readString(data, "id");
 }
 
 function extractMessage(event: UnthreadQueuedEvent): string {
-  const { data } = event;
+  const data = eventDataRecord(event);
   const value = data.body ?? data.content ?? data.text;
   return typeof value === "string" ? value.trim() : "";
+}
+
+function extractStatus(event: UnthreadQueuedEvent): string {
+  const conversation = conversationRecord(event);
+  const data = eventDataRecord(event);
+
+  return normalize(conversation.status)
+    || normalize(data.status);
+}
+
+function extractPreviousStatus(event: UnthreadQueuedEvent): string {
+  const conversation = conversationRecord(event);
+  const data = eventDataRecord(event);
+
+  return normalize(conversation.previousStatus)
+    || normalize(data.previousStatus);
+}
+
+function extractFriendlyId(event: UnthreadQueuedEvent): unknown {
+  const conversation = conversationRecord(event);
+  const data = eventDataRecord(event);
+
+  return conversation.friendlyId ?? data.friendlyId;
 }
 
 function isMessageEvent(event: UnthreadQueuedEvent): boolean {
@@ -57,10 +101,25 @@ function isConversationUpdateEvent(event: UnthreadQueuedEvent): boolean {
 
 async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<void> {
   const conversationId = extractConversationId(event);
-  const newStatus = normalize(event.data.status);
+  const newStatus = extractStatus(event);
+  const previousStatus = extractPreviousStatus(event);
+  const friendlyId = extractFriendlyId(event);
+
+  LogEngine.debug("Processing conversation update event", {
+    eventType: event.type,
+    sourcePlatform: event.sourcePlatform,
+    targetPlatform: event.targetPlatform,
+    conversationId,
+    newStatus,
+    previousStatus,
+    hasNestedConversation: eventDataRecord(event).conversation && typeof eventDataRecord(event).conversation === "object",
+  });
 
   if (!conversationId || !newStatus) {
-    LogEngine.debug("Skipping conversation_updated: missing conversationId or status");
+    LogEngine.debug("Skipping conversation_updated: missing conversationId or status", {
+      eventType: event.type,
+      dataKeys: Object.keys(eventDataRecord(event)),
+    });
     return;
   }
 
@@ -72,8 +131,8 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
 
   // Use friendlyId from event payload first, fall back to API call
   let ticketNumber: string;
-  if (event.data.friendlyId) {
-    ticketNumber = resolveTicketNumber(event.data.friendlyId, conversationId);
+  if (friendlyId) {
+    ticketNumber = resolveTicketNumber(friendlyId, conversationId);
   } else {
     try {
       const conversation = await unthread.getConversation(conversationId);
@@ -87,11 +146,18 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
     }
   }
 
-  const previousStatus = normalize(event.data.previousStatus);
   const sent = await sendStatusChangeMessage(phone, ticketNumber, newStatus, previousStatus || undefined);
 
   if (sent) {
     LogEngine.info("Status change notification sent", { phone, conversationId, newStatus, ticketNumber });
+  } else {
+    LogEngine.debug("Status change notification skipped", {
+      phone,
+      conversationId,
+      newStatus,
+      previousStatus,
+      ticketNumber,
+    });
   }
 }
 

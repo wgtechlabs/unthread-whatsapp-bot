@@ -22,9 +22,7 @@ const templates = {
     "*Support Ticket Created*",
     "",
     "Ticket #{{ticketNumber}}",
-    "Your message has been received and a support ticket has been created. An agent will respond shortly.",
-    "",
-    "Reply to this chat to add more details to your ticket.",
+    "Your ticket has been created. We'll respond shortly.",
   ].join("\n"),
 
   ticket_closed: [
