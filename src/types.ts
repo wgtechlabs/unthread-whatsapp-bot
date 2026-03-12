@@ -10,6 +10,8 @@ export interface TwilioIncomingMessage {
   WaId?: string; // WhatsApp ID (phone number without +)
 }
 
+export type UnthreadFriendlyId = string | number;
+
 // Unthread API types
 export interface UnthreadCustomer {
   id: string;
@@ -23,7 +25,7 @@ export interface UnthreadConversation {
   customerId: string;
   status: string;
   title?: string;
-  friendlyId?: string;
+  friendlyId?: UnthreadFriendlyId;
 }
 
 export interface UnthreadMessage {
@@ -50,7 +52,7 @@ export interface UnthreadQueuedEvent {
     type?: string;
     status?: string;
     previousStatus?: string;
-    friendlyId?: string;
+    friendlyId?: UnthreadFriendlyId;
     [key: string]: unknown;
   };
 }

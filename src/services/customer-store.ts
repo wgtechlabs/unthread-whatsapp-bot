@@ -97,7 +97,7 @@ export async function resolveConversation(
   mapping: CustomerMapping,
   initialMessage: string,
   onBehalfOf: { email: string; name: string },
-): Promise<{ conversationId: string; isNew: boolean; friendlyId?: string }> {
+): Promise<{ conversationId: string; isNew: boolean; friendlyId?: string | number }> {
   // 1. Try the stored conversationId first
   if (mapping.conversationId) {
     try {

@@ -32,6 +32,19 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function normalizeFriendlyId(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (typeof value === "number" || typeof value === "bigint") {
+    return String(value);
+  }
+
+  return null;
+}
+
 function isValidCustomerRecord(value: unknown): value is WhatsAppCustomerRecord {
   if (!value || typeof value !== "object") {
     return false;
@@ -55,7 +68,7 @@ function isValidTicketRecord(value: unknown): value is WhatsAppTicketRecord {
   return isNonEmptyString(record.conversationId)
     && isNonEmptyString(record.customerId)
     && isNonEmptyString(record.phone)
-    && (record.friendlyId === null || record.friendlyId === undefined || typeof record.friendlyId === "string")
+    && (record.friendlyId === null || record.friendlyId === undefined || typeof record.friendlyId === "string" || typeof record.friendlyId === "number" || typeof record.friendlyId === "bigint")
     && (record.status === null || record.status === undefined || typeof record.status === "string")
     && (record.profileName === null || record.profileName === undefined || typeof record.profileName === "string")
     && isNonEmptyString(record.createdAt)
@@ -71,8 +84,9 @@ function primeTicketCaches(record: WhatsAppTicketRecord): void {
   ticketByConversationCache.set(record.conversationId, record);
   phoneByConversationCache.set(record.conversationId, record.phone);
 
-  if (record.friendlyId) {
-    ticketByFriendlyIdCache.set(record.friendlyId, record);
+  const friendlyId = normalizeFriendlyId(record.friendlyId);
+  if (friendlyId) {
+    ticketByFriendlyIdCache.set(friendlyId, record);
   }
 }
 
@@ -169,12 +183,16 @@ export async function getCustomerById(customerId: string): Promise<WhatsAppCusto
   return stored;
 }
 
-export async function storeTicket(record: Omit<WhatsAppTicketRecord, "createdAt" | "updatedAt"> & Partial<Pick<WhatsAppTicketRecord, "createdAt" | "updatedAt">>): Promise<WhatsAppTicketRecord> {
+export async function storeTicket(record: Omit<WhatsAppTicketRecord, "createdAt" | "updatedAt" | "friendlyId"> & {
+  friendlyId?: string | number | bigint | null;
+} & Partial<Pick<WhatsAppTicketRecord, "createdAt" | "updatedAt">>): Promise<WhatsAppTicketRecord> {
   const existing = await getTicketByConversationId(record.conversationId);
   const timestamp = nowIso();
+  const friendlyId = normalizeFriendlyId(record.friendlyId ?? existing?.friendlyId);
   const normalized: WhatsAppTicketRecord = {
     ...existing,
     ...record,
+    friendlyId,
     createdAt: record.createdAt ?? existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
@@ -184,8 +202,8 @@ export async function storeTicket(record: Omit<WhatsAppTicketRecord, "createdAt"
     storage().setNamespaced(NS_CONVERSATION_PHONE, normalized.conversationId, normalized.phone),
   ];
 
-  if (normalized.friendlyId) {
-    writes.push(storage().setNamespaced(NS_TICKET_FRIENDLY, normalized.friendlyId, normalized));
+  if (friendlyId) {
+    writes.push(storage().setNamespaced(NS_TICKET_FRIENDLY, friendlyId, normalized));
   }
 
   const results = await Promise.all(writes);
@@ -201,8 +219,8 @@ export async function storeTicket(record: Omit<WhatsAppTicketRecord, "createdAt"
   await Promise.all([
     verifyNamespacedRecord(NS_TICKET_CONVERSATION, normalized.conversationId, isValidTicketRecord, "ticket-by-conversation"),
     verifyNamespacedRecord(NS_CONVERSATION_PHONE, normalized.conversationId, isNonEmptyString, "conversation-phone-index"),
-    normalized.friendlyId
-      ? verifyNamespacedRecord(NS_TICKET_FRIENDLY, normalized.friendlyId, isValidTicketRecord, "ticket-by-friendly")
+    friendlyId
+      ? verifyNamespacedRecord(NS_TICKET_FRIENDLY, friendlyId, isValidTicketRecord, "ticket-by-friendly")
       : Promise.resolve(),
   ]);
 
@@ -231,17 +249,22 @@ export async function getTicketByConversationId(conversationId: string): Promise
 }
 
 export async function getTicketByFriendlyId(friendlyId: string): Promise<WhatsAppTicketRecord | null> {
-  const cached = ticketByFriendlyIdCache.get(friendlyId);
+  const normalizedFriendlyId = normalizeFriendlyId(friendlyId);
+  if (!normalizedFriendlyId) {
+    return null;
+  }
+
+  const cached = ticketByFriendlyIdCache.get(normalizedFriendlyId);
   if (cached) {
     return cached;
   }
 
-  const stored = await storage().getNamespaced(NS_TICKET_FRIENDLY, friendlyId);
+  const stored = await storage().getNamespaced(NS_TICKET_FRIENDLY, normalizedFriendlyId);
   if (!isValidTicketRecord(stored)) {
     if (stored !== null && stored !== undefined) {
-      LogEngine.warn("Ignoring invalid WhatsApp ticket record by friendly id", { friendlyId, raw: stored });
+      LogEngine.warn("Ignoring invalid WhatsApp ticket record by friendly id", { friendlyId: normalizedFriendlyId, raw: stored });
     } else {
-      LogEngine.warn("WhatsApp ticket record not found by friendly id", { friendlyId });
+      LogEngine.warn("WhatsApp ticket record not found by friendly id", { friendlyId: normalizedFriendlyId });
     }
     return null;
   }
