@@ -6,7 +6,7 @@
       "name": "unthread-whatsapp-bot",
       "dependencies": {
         "@wgtechlabs/log-engine": "^2.3.1",
-        "@wgtechlabs/nuvex": "^0.2.0",
+        "@wgtechlabs/nuvex": "0.2.1",
         "express": "^5.1.0",
         "pg": "^8.18.0",
         "redis": "^5.11.0",
@@ -54,7 +54,7 @@
 
     "@wgtechlabs/log-engine": ["@wgtechlabs/log-engine@2.3.1", "", {}, "sha512-qYwGef4KjcWpFvfC/e6uum/Q2ICTJbaXBZf+qCDmho1rNZ/umqyeDH3Cvk86e2Jy5TkDFPA+rOcTkmrM1rGKkw=="],
 
-    "@wgtechlabs/nuvex": ["@wgtechlabs/nuvex@0.2.0", "", { "dependencies": { "pg": "^8.13.0", "redis": "^4.7.0" } }, "sha512-LpEunneBntqv9WTBxBlY7DusXUJVxWKHkyQWr4IATkIiB5CmCEHUN3Np2j6bqqQNZGPRHhp+psFfjEC1TctRWA=="],
+    "@wgtechlabs/nuvex": ["@wgtechlabs/nuvex@0.2.1", "", { "dependencies": { "pg": "^8.13.0", "redis": "^4.7.0" } }, "sha512-1Uc/rq7Fito5L0/mzW7Y6CzVZX38qwfLwqZtHNlcjP3QOtbuAiABcsKXQUYjZJMPJLIxPpWVldAAKoXTaTF1bA=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
