@@ -123,7 +123,7 @@ export async function resolveConversation(
       });
       mapping.conversationId = updatedCustomer.conversationId;
     } catch (err) {
-      LogEngine.warn("Failed to fetch stored conversation, will search for open ones", {
+      LogEngine.debug("Failed to fetch stored conversation, will search for open ones", {
         conversationId: mapping.conversationId,
         error: err instanceof Error ? err.message : String(err),
       });

@@ -154,7 +154,7 @@ export async function getCustomerByPhone(phone: string): Promise<WhatsAppCustome
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp customer record by phone", { phone, raw: stored });
     } else {
-      LogEngine.warn("WhatsApp customer record not found in storage", { phone });
+      LogEngine.debug("WhatsApp customer record not found in storage", { phone });
     }
     return null;
   }
@@ -174,7 +174,7 @@ export async function getCustomerById(customerId: string): Promise<WhatsAppCusto
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp customer record by id", { customerId, raw: stored });
     } else {
-      LogEngine.warn("WhatsApp customer record not found by id", { customerId });
+      LogEngine.debug("WhatsApp customer record not found by id", { customerId });
     }
     return null;
   }
@@ -239,7 +239,7 @@ export async function getTicketByConversationId(conversationId: string): Promise
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp ticket record by conversation", { conversationId, raw: stored });
     } else {
-      LogEngine.warn("WhatsApp ticket record not found by conversation", { conversationId });
+      LogEngine.debug("WhatsApp ticket record not found by conversation", { conversationId });
     }
     return null;
   }
@@ -264,7 +264,7 @@ export async function getTicketByFriendlyId(friendlyId: string): Promise<WhatsAp
     if (stored !== null && stored !== undefined) {
       LogEngine.warn("Ignoring invalid WhatsApp ticket record by friendly id", { friendlyId: normalizedFriendlyId, raw: stored });
     } else {
-      LogEngine.warn("WhatsApp ticket record not found by friendly id", { friendlyId: normalizedFriendlyId });
+      LogEngine.debug("WhatsApp ticket record not found by friendly id", { friendlyId: normalizedFriendlyId });
     }
     return null;
   }
@@ -285,7 +285,7 @@ export async function getPhoneByConversationId(conversationId: string): Promise<
     return stored;
   }
 
-  LogEngine.warn("WhatsApp conversation phone index not found", { conversationId });
+  LogEngine.debug("WhatsApp conversation phone index not found", { conversationId });
 
   const ticket = await getTicketByConversationId(conversationId);
   if (ticket) {

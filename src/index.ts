@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import express from "express";
 import { NuvexClient } from "@wgtechlabs/nuvex";
 import type { NuvexConfig, StorageOptions } from "@wgtechlabs/nuvex";
-import { LogEngine } from "@wgtechlabs/log-engine";
+import { LogEngine, LogMode } from "@wgtechlabs/log-engine";
 import { config } from "./config";
 import { setStorage } from "./services/customer-store";
 import { twilioWebhookRouter } from "./routes/twilio-webhook";
@@ -12,6 +12,14 @@ import { UnthreadWebhookConsumer } from "./services/unthread-webhook-consumer";
 // Read bot version from package.json
 const pkg = JSON.parse(readFileSync(resolve(import.meta.dir, "../package.json"), "utf-8"));
 const BOT_VERSION: string = pkg.version;
+
+LogEngine.configure({
+  mode: config.nodeEnv === "production"
+    ? LogMode.INFO
+    : config.nodeEnv === "test"
+      ? LogMode.ERROR
+      : LogMode.DEBUG,
+});
 
 async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
   LogEngine.info("Storage diagnostics: configuration", {

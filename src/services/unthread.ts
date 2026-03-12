@@ -55,7 +55,7 @@ export async function findCustomerByEmail(
     );
     return customers.length > 0 ? customers[0] : null;
   } catch (err) {
-    LogEngine.warn("Failed to find customer by email", {
+    LogEngine.debug("Failed to find customer by email", {
       email,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -156,7 +156,7 @@ export async function findOpenConversationByCustomer(
 
     return open ?? null;
   } catch (err) {
-    LogEngine.warn("Failed to find open conversation for customer", {
+    LogEngine.debug("Failed to find open conversation for customer", {
       customerId,
       error: err instanceof Error ? err.message : String(err),
     });
