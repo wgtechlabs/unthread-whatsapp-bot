@@ -15,6 +15,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+## [1.2.0] - 2026-03-12
+
+### Added
+
+- introduce WhatsApp store service abstraction
+
+### Changed
+
+- ignore `.codex` and `.vscode` directories
+- add fallback email forwarding and hardcode unthread API URL
+- add WhatsApp identity resolution, email support, and ticket status messaging
+- replace placeholder banner with live dynamic banner image
+- add storage diagnostics logging on startup (#1)
+- add persistence verification and write failure guards
+- align outbound and system messages with new store
+- refactor storage to use whatsapp-store
+- return friendlyId and status from conversation lookup
+- extend types for ticket status and store records
+- improve event data extraction and simplify ticket message
+- harden webhook error handling and ticket number input types
+- respond before sending post-webhook system messages
+- refactor ticket confirmation handling and improve logging
+- send ticket confirmation via inline TwiML response
+
 ## [1.1.1] - 2026-03-06
 
 ### Changed
