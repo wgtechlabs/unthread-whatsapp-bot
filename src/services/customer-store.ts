@@ -3,6 +3,7 @@ import type { CustomerMapping } from "../types";
 import * as unthread from "./unthread";
 import { buildWhatsAppFallbackEmail, formatWhatsAppIdentity } from "./whatsapp-identity";
 import {
+  deleteCustomerRecord,
   getCustomerById,
   getCustomerByPhone,
   getPhoneByConversationId,
@@ -76,14 +77,26 @@ async function hydrateExistingCustomer(
   });
 
   if (openConvo) {
-    await storeTicket({
-      conversationId: openConvo.id,
-      customerId: existingCustomer.id,
-      phone,
-      friendlyId: openConvo.friendlyId ?? null,
-      status: openConvo.status,
-      profileName,
-    });
+    try {
+      await storeTicket({
+        conversationId: openConvo.id,
+        customerId: existingCustomer.id,
+        phone,
+        friendlyId: openConvo.friendlyId ?? null,
+        status: openConvo.status,
+        profileName,
+      });
+    } catch (error) {
+      const rollbackOk = await deleteCustomerRecord(phone, existingCustomer.id);
+      LogEngine.error("Failed to persist recovered WhatsApp ticket state", {
+        phone,
+        customerId: existingCustomer.id,
+        conversationId: openConvo.id,
+        rollbackOk,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   return toCustomerMapping(customerRecord);

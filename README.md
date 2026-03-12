@@ -8,6 +8,8 @@
 
 This bot is designed for businesses managing customer support through WhatsApp — optimized for professional support workflows with seamless bidirectional communication between your team and customers.
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/CveS2G)
+
 ## 🤗 Special Thanks
 
 <!-- markdownlint-disable MD033 -->
@@ -97,12 +99,13 @@ cp .env.example .env
 | `TWILIO_AUTH_TOKEN` | Twilio authentication token | — |
 | `TWILIO_WHATSAPP_NUMBER` | Twilio WhatsApp business number | `whatsapp:+14155238886` |
 | `UNTHREAD_API_KEY` | Unthread API key | — |
-| `UNTHREAD_API_URL` | Unthread API endpoint | `https://api.unthread.io/api` |
 | `UNTHREAD_SLACK_CHANNEL_ID` | Target Slack channel for tickets | — |
 | `UNTHREAD_WEBHOOK_SECRET` | Webhook secret (optional) | — |
 | `POSTGRES_URL` | PostgreSQL connection string | — |
 | `REDIS_URL` | Redis for platform caching (optional) | `redis://localhost:6379` |
 | `WEBHOOK_REDIS_URL` | Redis for webhook queue | `redis://localhost:6380` |
+
+The Unthread API base URL is hardcoded in the project to `https://api.unthread.io/api` and is not configurable through the environment.
 
 ### Run
 

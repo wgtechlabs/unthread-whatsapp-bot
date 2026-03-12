@@ -147,12 +147,24 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
     }
   }
 
-  const sent = await sendStatusChangeMessage(
-    phone,
-    ticketNumber,
-    newStatus,
-    previousStatus || undefined,
-  );
+  let sent = false;
+  try {
+    sent = await sendStatusChangeMessage(
+      phone,
+      ticketNumber,
+      newStatus,
+      previousStatus || undefined,
+    );
+  } catch (error) {
+    LogEngine.error("Failed to send WhatsApp status change notification", {
+      conversationId,
+      ticketNumber,
+      newStatus,
+      previousStatus,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   try {
     await updateTicketStatus(
       conversationId,

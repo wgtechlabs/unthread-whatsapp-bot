@@ -71,6 +71,30 @@ async function clearPendingEmailCollectionOrThrow(
   }
 }
 
+async function forwardWithFallbackEmail(
+  phone: string,
+  profileName: string | null,
+  messageBody: string,
+): Promise<void> {
+  const fallbackEmail = unthread.resolveCustomerEmail(null, phone);
+  const { conversationId, isNew, friendlyId } = await forwardCustomerMessage(
+    phone,
+    profileName,
+    messageBody,
+    fallbackEmail,
+  );
+
+  if (isNew) {
+    const ticketNumber = resolveTicketNumber(friendlyId, conversationId);
+    sendTicketCreatedMessage(phone, ticketNumber).catch((err) => {
+      LogEngine.warn("Failed to send ticket created notification", {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }
+}
+
 export const twilioWebhookRouter = Router();
 
 // POST /webhooks/twilio
@@ -159,11 +183,22 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     const existingCustomer = await findExistingCustomer(phone, profileName);
     if (!existingCustomer) {
       LogEngine.info("Starting email collection for new WhatsApp user", { phone });
-      await storeEmailCollectionState({
-        phone,
-        initialMessage: body,
-        profileName,
-      });
+      try {
+        await storeEmailCollectionState({
+          phone,
+          initialMessage: body,
+          profileName,
+        });
+      } catch (error) {
+        LogEngine.error("Failed to persist pending WhatsApp email collection state", {
+          phone,
+          profileName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
+        await forwardWithFallbackEmail(phone, profileName, body);
+        return;
+      }
 
       try {
         const promptSent = await sendEmailPromptMessage(phone);

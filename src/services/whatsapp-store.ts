@@ -38,6 +38,27 @@ function namespacedStorageKey(namespace: string, key: string): string {
   return `${namespace}:${key}`;
 }
 
+async function deleteNamespacedEntry(namespace: string, key: string): Promise<boolean> {
+  const deleteKey = namespacedStorageKey(namespace, key);
+
+  try {
+    const deleteOk = await storage().delete(deleteKey);
+    if (deleteOk) {
+      return true;
+    }
+
+    const persisted = await storage().getNamespaced(namespace, key, { skipCache: true });
+    return persisted === null;
+  } catch (error) {
+    LogEngine.error("Failed to delete WhatsApp store namespace entry", {
+      namespace,
+      key,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -159,6 +180,27 @@ export function initializeWhatsAppStore(client: NuvexClient): void {
   _storage = client;
 }
 
+export async function deleteCustomerRecord(phone: string, customerId: string): Promise<boolean> {
+  const [phoneDeleted, customerDeleted] = await Promise.all([
+    deleteNamespacedEntry(NS_CUSTOMER_PHONE, phone),
+    deleteNamespacedEntry(NS_CUSTOMER_ID, customerId),
+  ]);
+
+  customerByPhoneCache.delete(phone);
+  customerByIdCache.delete(customerId);
+
+  if (!phoneDeleted || !customerDeleted) {
+    LogEngine.warn("Customer rollback completed with partial failure", {
+      phone,
+      customerId,
+      phoneDeleted,
+      customerDeleted,
+    });
+  }
+
+  return phoneDeleted && customerDeleted;
+}
+
 async function verifyNamespacedRecord<T>(
   namespace: string,
   key: string,
@@ -189,16 +231,57 @@ export async function storeCustomer(
     updatedAt: timestamp,
   };
 
-  const results = await Promise.all([
-    storage().setNamespaced(NS_CUSTOMER_PHONE, normalized.phone, normalized),
-    storage().setNamespaced(NS_CUSTOMER_ID, normalized.customerId, normalized),
-  ]);
+  const writeTargets = [
+    {
+      namespace: NS_CUSTOMER_PHONE,
+      key: normalized.phone,
+      description: "customer-by-phone",
+      operation: storage().setNamespaced(NS_CUSTOMER_PHONE, normalized.phone, normalized),
+    },
+    {
+      namespace: NS_CUSTOMER_ID,
+      key: normalized.customerId,
+      description: "customer-by-id",
+      operation: storage().setNamespaced(NS_CUSTOMER_ID, normalized.customerId, normalized),
+    },
+  ] as const;
 
-  if (!results.every(Boolean)) {
+  const settled = await Promise.allSettled(writeTargets.map((target) => target.operation));
+  const writeResults = settled.map((result, index) => ({
+    ...writeTargets[index],
+    ok: result.status === "fulfilled" && result.value === true,
+    error:
+      result.status === "rejected"
+        ? result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason)
+        : null,
+    value: result.status === "fulfilled" ? result.value : null,
+  }));
+
+  if (!writeResults.every((result) => result.ok)) {
+    const rollbackResults = await Promise.all(
+      writeResults
+        .filter((result) => result.ok)
+        .map(async (result) => ({
+          namespace: result.namespace,
+          key: result.key,
+          rolledBack: await deleteNamespacedEntry(result.namespace, result.key),
+        })),
+    );
+
     LogEngine.error("Failed to persist WhatsApp customer record", {
       phone: normalized.phone,
       customerId: normalized.customerId,
-      results,
+      writeResults: writeResults.map((result) => ({
+        namespace: result.namespace,
+        key: result.key,
+        description: result.description,
+        ok: result.ok,
+        value: result.value,
+        error: result.error,
+      })),
+      rollbackResults,
     });
     throw new Error("Failed to persist WhatsApp customer record");
   }
@@ -288,6 +371,12 @@ export async function storeTicket(
     storage().setNamespaced(NS_TICKET_CONVERSATION, normalized.conversationId, normalized),
     storage().setNamespaced(NS_CONVERSATION_PHONE, normalized.conversationId, normalized.phone),
   ];
+
+  const previousFriendlyId = normalizeFriendlyId(existing?.friendlyId);
+  if (previousFriendlyId && previousFriendlyId !== friendlyId) {
+    writes.push(deleteNamespacedEntry(NS_TICKET_FRIENDLY, previousFriendlyId));
+    ticketByFriendlyIdCache.delete(previousFriendlyId);
+  }
 
   if (friendlyId) {
     writes.push(storage().setNamespaced(NS_TICKET_FRIENDLY, friendlyId, normalized));
@@ -412,31 +501,12 @@ export async function getEmailCollectionState(
 }
 
 export async function clearEmailCollectionState(phone: string): Promise<boolean> {
-  const deleteKey = namespacedStorageKey(NS_EMAIL_COLLECTION, phone);
-
-  try {
-    const deleteOk = await storage().delete(deleteKey);
-    if (!deleteOk) {
-      const persisted = await storage().getNamespaced(NS_EMAIL_COLLECTION, phone, {
-        skipCache: true,
-      });
-      if (persisted === null) {
-        emailCollectionCache.delete(phone);
-        return true;
-      }
-
-      LogEngine.warn("Failed to clear WhatsApp email collection state from storage", {
-        phone,
-        namespace: NS_EMAIL_COLLECTION,
-        deleteKey,
-      });
-      return false;
-    }
-  } catch (error) {
-    LogEngine.error("Error clearing WhatsApp email collection state", {
+  const cleared = await deleteNamespacedEntry(NS_EMAIL_COLLECTION, phone);
+  if (!cleared) {
+    LogEngine.warn("Failed to clear WhatsApp email collection state from storage", {
       phone,
       namespace: NS_EMAIL_COLLECTION,
-      error: error instanceof Error ? error.message : String(error),
+      deleteKey: namespacedStorageKey(NS_EMAIL_COLLECTION, phone),
     });
     return false;
   }

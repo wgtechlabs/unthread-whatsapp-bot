@@ -75,7 +75,7 @@ export interface WhatsAppTicketRecord {
   conversationId: string;
   customerId: string;
   phone: string;
-  friendlyId: string | null;
+  friendlyId: UnthreadFriendlyId | null;
   status: string | null;
   profileName: string | null;
   createdAt: string;

@@ -81,8 +81,7 @@ export async function findCustomerByPhone(phone: string): Promise<UnthreadCustom
   return null;
 }
 
-// Create a new customer in Unthread
-// Following the pattern: {phone@whatsapp.user} as dummy email
+// Create a new customer in Unthread using the resolved customer identity and email.
 export async function createCustomer(
   phone: string,
   name: string,

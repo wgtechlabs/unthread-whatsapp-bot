@@ -40,6 +40,7 @@ function normalizeNodeEnv(
 }
 
 export const nodeEnv = normalizeNodeEnv(process.env.NODE_ENV);
+const UNTHREAD_API_URL = "https://api.unthread.io/api";
 
 function parsePostgresUrl(url: string) {
   const parsed = new URL(url);
@@ -49,7 +50,7 @@ function parsePostgresUrl(url: string) {
     database: parsed.pathname.replace("/", ""),
     user: parsed.username,
     password: parsed.password,
-    autoSetupSchema: optionalBooleanEnv("NUVEX_AUTO_SETUP_SCHEMA", true),
+    autoSetupSchema: optionalBooleanEnv("NUVEX_AUTO_SETUP_SCHEMA", nodeEnv !== "production"),
   };
 }
 
@@ -65,7 +66,7 @@ export const config = {
 
   unthread: {
     apiKey: requireEnv("UNTHREAD_API_KEY"),
-    apiUrl: optionalEnv("UNTHREAD_API_URL", "https://api.unthread.io/api"),
+    apiUrl: UNTHREAD_API_URL,
     channelId: requireEnv("UNTHREAD_SLACK_CHANNEL_ID"),
     webhookSecret: optionalEnv("UNTHREAD_WEBHOOK_SECRET", ""),
   },
