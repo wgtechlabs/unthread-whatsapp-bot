@@ -6,3 +6,5 @@ dist/
 package-lock.json
 *.http
 .contributerc.json
+.codex
+.vscode
