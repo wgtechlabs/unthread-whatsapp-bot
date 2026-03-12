@@ -10,6 +10,16 @@ function optionalEnv(key: string, fallback: string): string {
   return process.env[key] || fallback;
 }
 
+function optionalBooleanEnv(key: string, fallback: boolean): boolean {
+  const value = process.env[key];
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
 function parsePostgresUrl(url: string) {
   const parsed = new URL(url);
   return {
@@ -18,6 +28,7 @@ function parsePostgresUrl(url: string) {
     database: parsed.pathname.replace("/", ""),
     user: parsed.username,
     password: parsed.password,
+    autoSetupSchema: optionalBooleanEnv("NUVEX_AUTO_SETUP_SCHEMA", true),
   };
 }
 
