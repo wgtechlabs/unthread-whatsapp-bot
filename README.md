@@ -91,6 +91,7 @@ cp .env.example .env
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `NODE_ENV` | Runtime environment. Accepts `dev`/`development` or `prod`/`production`; controls Log Engine verbosity | `development` |
 | `PORT` | Application port | `3000` |
 | `TWILIO_ACCOUNT_SID` | Twilio account ID | — |
 | `TWILIO_AUTH_TOKEN` | Twilio authentication token | — |
@@ -112,6 +113,11 @@ bun dev
 # Production
 bun start
 ```
+
+Logging behavior is handled by `@wgtechlabs/log-engine` based on `NODE_ENV`:
+
+- `dev` or `development` enables debug logs
+- `prod` or `production` shows info-and-above logs
 
 ### Endpoints
 

@@ -10,6 +10,38 @@ function optionalEnv(key: string, fallback: string): string {
   return process.env[key] || fallback;
 }
 
+function optionalBooleanEnv(key: string, fallback: boolean): boolean {
+  const value = process.env[key];
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function normalizeNodeEnv(value: string | undefined): "development" | "production" | "test" | "staging" {
+  const normalized = value?.trim().toLowerCase();
+
+  switch (normalized) {
+    case "prod":
+    case "production":
+      return "production";
+    case "test":
+      return "test";
+    case "stage":
+    case "staging":
+      return "staging";
+    case "dev":
+    case "development":
+    default:
+      return "development";
+  }
+}
+
+const nodeEnv = normalizeNodeEnv(process.env.NODE_ENV);
+process.env.NODE_ENV = nodeEnv;
+
 function parsePostgresUrl(url: string) {
   const parsed = new URL(url);
   return {
@@ -18,10 +50,12 @@ function parsePostgresUrl(url: string) {
     database: parsed.pathname.replace("/", ""),
     user: parsed.username,
     password: parsed.password,
+    autoSetupSchema: optionalBooleanEnv("NUVEX_AUTO_SETUP_SCHEMA", true),
   };
 }
 
 export const config = {
+  nodeEnv,
   port: parseInt(optionalEnv("PORT", "3000"), 10),
 
   twilio: {

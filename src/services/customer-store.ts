@@ -97,7 +97,7 @@ export async function resolveConversation(
   mapping: CustomerMapping,
   initialMessage: string,
   onBehalfOf: { email: string; name: string },
-): Promise<{ conversationId: string; isNew: boolean; friendlyId?: string }> {
+): Promise<{ conversationId: string; isNew: boolean; friendlyId?: string | number }> {
   // 1. Try the stored conversationId first
   if (mapping.conversationId) {
     try {
@@ -123,7 +123,7 @@ export async function resolveConversation(
       });
       mapping.conversationId = updatedCustomer.conversationId;
     } catch (err) {
-      LogEngine.warn("Failed to fetch stored conversation, will search for open ones", {
+      LogEngine.debug("Failed to fetch stored conversation, will search for open ones", {
         conversationId: mapping.conversationId,
         error: err instanceof Error ? err.message : String(err),
       });
