@@ -1,8 +1,8 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import type { UnthreadQueuedEvent } from "../types";
 import { findPhoneByConversationId } from "./customer-store";
+import { resolveTicketNumber, sendStatusChangeMessage } from "./system-messages";
 import { sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
-import { sendStatusChangeMessage, resolveTicketNumber } from "./system-messages";
 import * as unthread from "./unthread";
 import { updateTicketStatus } from "./whatsapp-store";
 
@@ -21,9 +21,7 @@ function eventDataRecord(event: UnthreadQueuedEvent): Record<string, unknown> {
 function conversationRecord(event: UnthreadQueuedEvent): Record<string, unknown> {
   const data = eventDataRecord(event);
   const nested = data.conversation;
-  return nested && typeof nested === "object"
-    ? nested as Record<string, unknown>
-    : data;
+  return nested && typeof nested === "object" ? (nested as Record<string, unknown>) : data;
 }
 
 function readString(record: Record<string, unknown>, key: string): string {
@@ -35,10 +33,12 @@ function extractConversationId(event: UnthreadQueuedEvent): string {
   const conversation = conversationRecord(event);
   const data = eventDataRecord(event);
 
-  return readString(conversation, "conversationId")
-    || readString(conversation, "id")
-    || readString(data, "conversationId")
-    || readString(data, "id");
+  return (
+    readString(conversation, "conversationId") ||
+    readString(conversation, "id") ||
+    readString(data, "conversationId") ||
+    readString(data, "id")
+  );
 }
 
 function extractMessage(event: UnthreadQueuedEvent): string {
@@ -51,16 +51,14 @@ function extractStatus(event: UnthreadQueuedEvent): string {
   const conversation = conversationRecord(event);
   const data = eventDataRecord(event);
 
-  return normalize(conversation.status)
-    || normalize(data.status);
+  return normalize(conversation.status) || normalize(data.status);
 }
 
 function extractPreviousStatus(event: UnthreadQueuedEvent): string {
   const conversation = conversationRecord(event);
   const data = eventDataRecord(event);
 
-  return normalize(conversation.previousStatus)
-    || normalize(data.previousStatus);
+  return normalize(conversation.previousStatus) || normalize(data.previousStatus);
 }
 
 function extractFriendlyId(event: UnthreadQueuedEvent): unknown {
@@ -113,7 +111,9 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
     conversationId,
     newStatus,
     previousStatus,
-    hasNestedConversation: eventDataRecord(event).conversation && typeof eventDataRecord(event).conversation === "object",
+    hasNestedConversation:
+      eventDataRecord(event).conversation &&
+      typeof eventDataRecord(event).conversation === "object",
   });
 
   if (!conversationId || !newStatus) {
@@ -147,11 +147,34 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
     }
   }
 
-  const sent = await sendStatusChangeMessage(phone, ticketNumber, newStatus, previousStatus || undefined);
-  await updateTicketStatus(conversationId, newStatus, typeof friendlyId === "string" ? friendlyId : null);
+  const sent = await sendStatusChangeMessage(
+    phone,
+    ticketNumber,
+    newStatus,
+    previousStatus || undefined,
+  );
+  try {
+    await updateTicketStatus(
+      conversationId,
+      newStatus,
+      typeof friendlyId === "string" ? friendlyId : null,
+    );
+  } catch (error) {
+    LogEngine.error("Failed to persist WhatsApp ticket status update", {
+      conversationId,
+      ticketNumber,
+      newStatus,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   if (sent) {
-    LogEngine.info("Status change notification sent", { phone, conversationId, newStatus, ticketNumber });
+    LogEngine.info("Status change notification sent", {
+      phone,
+      conversationId,
+      newStatus,
+      ticketNumber,
+    });
   } else {
     LogEngine.debug("Status change notification skipped", {
       phone,

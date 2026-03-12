@@ -1,6 +1,7 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import type { CustomerMapping } from "../types";
 import * as unthread from "./unthread";
+import { buildWhatsAppFallbackEmail, formatWhatsAppIdentity } from "./whatsapp-identity";
 import {
   getCustomerById,
   getCustomerByPhone,
@@ -11,11 +12,13 @@ import {
 } from "./whatsapp-store";
 
 function isReusableConversationStatus(status: string | null | undefined): boolean {
-  return status === "open"
-    || status === "waiting"
-    || status === "on_hold"
-    || status === "on-hold"
-    || status === "in_progress";
+  return (
+    status === "open" ||
+    status === "waiting" ||
+    status === "on_hold" ||
+    status === "on-hold" ||
+    status === "in_progress"
+  );
 }
 
 export function setStorage(client: Parameters<typeof initializeWhatsAppStore>[0]): void {
@@ -27,66 +30,132 @@ function toCustomerMapping(record: {
   customerId: string;
   conversationId: string | null;
   profileName: string | null;
+  email: string | null;
 }): CustomerMapping {
   return {
     phone: record.phone,
     customerId: record.customerId,
     conversationId: record.conversationId,
     profileName: record.profileName,
+    email: record.email,
   };
+}
+
+async function hydrateExistingCustomer(
+  phone: string,
+  profileName: string | null,
+  email: string | null,
+): Promise<CustomerMapping | null> {
+  const existingCustomer = email
+    ? ((await unthread.findCustomerByEmail(email)) ?? (await unthread.findCustomerByPhone(phone)))
+    : await unthread.findCustomerByPhone(phone);
+
+  if (!existingCustomer) {
+    return null;
+  }
+
+  const recoveredEmail =
+    typeof existingCustomer.email === "string" && existingCustomer.email.trim().length > 0
+      ? existingCustomer.email.trim()
+      : (email ?? unthread.resolveCustomerEmail(null, phone));
+
+  LogEngine.debug("Customer recovered from Unthread API", {
+    phone,
+    customerId: existingCustomer.id,
+    email: recoveredEmail,
+  });
+
+  const openConvo = await unthread.findOpenConversationByCustomer(existingCustomer.id);
+
+  const customerRecord = await storeCustomer({
+    phone,
+    customerId: existingCustomer.id,
+    conversationId: openConvo?.id ?? null,
+    profileName,
+    email: recoveredEmail,
+  });
+
+  if (openConvo) {
+    await storeTicket({
+      conversationId: openConvo.id,
+      customerId: existingCustomer.id,
+      phone,
+      friendlyId: openConvo.friendlyId ?? null,
+      status: openConvo.status,
+      profileName,
+    });
+  }
+
+  return toCustomerMapping(customerRecord);
+}
+
+export async function findExistingCustomer(
+  phone: string,
+  profileName: string | null,
+): Promise<CustomerMapping | null> {
+  const stored = await getCustomerByPhone(phone);
+  if (stored) {
+    LogEngine.debug("Customer resolved from WhatsApp store", {
+      phone,
+      customerId: stored.customerId,
+    });
+    return toCustomerMapping(stored);
+  }
+
+  const fallbackEmail = buildWhatsAppFallbackEmail(phone);
+  return hydrateExistingCustomer(phone, profileName, fallbackEmail);
 }
 
 // Resolve or create an Unthread customer from a WhatsApp message
 export async function resolveCustomer(
   phone: string,
   profileName: string | null,
+  email: string,
 ): Promise<CustomerMapping> {
   const stored = await getCustomerByPhone(phone);
   if (stored) {
-    LogEngine.debug("Customer resolved from WhatsApp store", { phone, customerId: stored.customerId });
+    const normalizedProfileName = profileName ?? stored.profileName;
+    const normalizedEmail = stored.email ?? email;
+
+    if (stored.profileName !== normalizedProfileName || stored.email !== normalizedEmail) {
+      const updatedRecord = await storeCustomer({
+        ...stored,
+        profileName: normalizedProfileName,
+        email: normalizedEmail,
+      });
+      LogEngine.debug("Customer refreshed in WhatsApp store", {
+        phone,
+        customerId: updatedRecord.customerId,
+        email: updatedRecord.email,
+      });
+      return toCustomerMapping(updatedRecord);
+    }
+
+    LogEngine.debug("Customer resolved from WhatsApp store", {
+      phone,
+      customerId: stored.customerId,
+    });
     return toCustomerMapping(stored);
   }
 
-  // Try to find existing customer in Unthread by dummy email
-  const cleanPhone = phone.replace(/[^0-9]/g, "");
-  const dummyEmail = `${cleanPhone}@whatsapp.user`;
-  const existingCustomer = await unthread.findCustomerByEmail(dummyEmail);
-
+  const existingCustomer = await hydrateExistingCustomer(phone, profileName, email);
   if (existingCustomer) {
-    LogEngine.debug("Customer recovered from Unthread API", { phone, customerId: existingCustomer.id });
-
-    const openConvo = await unthread.findOpenConversationByCustomer(existingCustomer.id);
-
-    const customerRecord = await storeCustomer({
-      phone,
-      customerId: existingCustomer.id,
-      conversationId: openConvo?.id ?? null,
-      profileName,
-    });
-
-    if (openConvo) {
-      await storeTicket({
-        conversationId: openConvo.id,
-        customerId: existingCustomer.id,
-        phone,
-        friendlyId: openConvo.friendlyId ?? null,
-        status: openConvo.status,
-        profileName,
-      });
-    }
-
-    return toCustomerMapping(customerRecord);
+    return existingCustomer;
   }
 
-  LogEngine.debug("Creating new Unthread customer", { phone, profileName });
-  const name = profileName || phone;
-  const customer = await unthread.createCustomer(phone, name);
+  LogEngine.debug("Creating new Unthread customer", { phone, profileName, email });
+  const customer = await unthread.createCustomer(
+    phone,
+    formatWhatsAppIdentity(profileName, phone),
+    email,
+  );
 
   const customerRecord = await storeCustomer({
     phone,
     customerId: customer.id,
     conversationId: null,
     profileName,
+    email,
   });
 
   return toCustomerMapping(customerRecord);
@@ -115,7 +184,7 @@ export async function resolveConversation(
         status: convo.status,
       });
       const updatedCustomer = await storeCustomer({
-        ...(await getCustomerById(mapping.customerId) ?? mapping),
+        ...((await getCustomerById(mapping.customerId)) ?? mapping),
         phone: mapping.phone,
         customerId: mapping.customerId,
         conversationId: null,
@@ -139,7 +208,7 @@ export async function resolveConversation(
       customerId: mapping.customerId,
     });
     const updatedCustomer = await storeCustomer({
-      ...(await getCustomerById(mapping.customerId) ?? mapping),
+      ...((await getCustomerById(mapping.customerId)) ?? mapping),
       phone: mapping.phone,
       customerId: mapping.customerId,
       conversationId: openConvo.id,
@@ -158,16 +227,24 @@ export async function resolveConversation(
   }
 
   // 3. No open conversations found — create a new one
-  LogEngine.debug("No open conversation found, creating new one", { customerId: mapping.customerId });
-  const title = `WhatsApp: ${mapping.profileName || mapping.phone}`;
-  const convo = await unthread.createConversation(mapping.customerId, title, initialMessage, onBehalfOf);
+  LogEngine.debug("No open conversation found, creating new one", {
+    customerId: mapping.customerId,
+  });
+  const title = `[WhatsApp Ticket] ${formatWhatsAppIdentity(mapping.profileName, mapping.phone)}`;
+  const convo = await unthread.createConversation(
+    mapping.customerId,
+    title,
+    initialMessage,
+    onBehalfOf,
+  );
 
   const updatedCustomer = await storeCustomer({
-    ...(await getCustomerById(mapping.customerId) ?? mapping),
+    ...((await getCustomerById(mapping.customerId)) ?? mapping),
     phone: mapping.phone,
     customerId: mapping.customerId,
     conversationId: convo.id,
     profileName: mapping.profileName,
+    ...(mapping.email !== null && mapping.email !== undefined ? { email: mapping.email } : {}),
   });
   await storeTicket({
     conversationId: convo.id,
@@ -183,8 +260,6 @@ export async function resolveConversation(
 }
 
 // Look up phone number by conversation ID (for outbound agent replies)
-export async function findPhoneByConversationId(
-  conversationId: string,
-): Promise<string | null> {
+export async function findPhoneByConversationId(conversationId: string): Promise<string | null> {
   return getPhoneByConversationId(conversationId);
 }

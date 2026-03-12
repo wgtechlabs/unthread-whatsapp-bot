@@ -1,10 +1,7 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
-import type {
-  UnthreadCustomer,
-  UnthreadConversation,
-  UnthreadMessage,
-} from "../types";
+import type { UnthreadConversation, UnthreadCustomer, UnthreadMessage } from "../types";
+import { buildWhatsAppFallbackEmail } from "./whatsapp-identity";
 
 const headers = {
   "Content-Type": "application/json",
@@ -12,18 +9,16 @@ const headers = {
 };
 
 function isReusableConversationStatus(status: string | undefined): boolean {
-  return status === "open"
-    || status === "waiting"
-    || status === "on_hold"
-    || status === "on-hold"
-    || status === "in_progress";
+  return (
+    status === "open" ||
+    status === "waiting" ||
+    status === "on_hold" ||
+    status === "on-hold" ||
+    status === "in_progress"
+  );
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const url = `${config.unthread.apiUrl}${path}`;
 
   LogEngine.debug(`Unthread API ${method} ${path}`, { payload: body });
@@ -39,15 +34,13 @@ async function request<T>(
     throw new Error(`Unthread API ${method} ${path} failed (${res.status}): ${text}`);
   }
 
-  const data = await res.json() as T;
+  const data = (await res.json()) as T;
   LogEngine.debug(`Unthread API ${method} ${path} response OK`);
   return data;
 }
 
 // Search for existing customer by email
-export async function findCustomerByEmail(
-  email: string,
-): Promise<UnthreadCustomer | null> {
+export async function findCustomerByEmail(email: string): Promise<UnthreadCustomer | null> {
   try {
     const customers = await request<UnthreadCustomer[]>(
       "GET",
@@ -63,20 +56,57 @@ export async function findCustomerByEmail(
   }
 }
 
+export async function findCustomerByPhone(phone: string): Promise<UnthreadCustomer | null> {
+  const queryPaths = [
+    `/customers?phoneNumber=${encodeURIComponent(phone)}`,
+    `/customers?phone=${encodeURIComponent(phone)}`,
+  ];
+
+  for (const path of queryPaths) {
+    try {
+      const customers = await request<UnthreadCustomer[]>("GET", path);
+      const exactMatch = customers.find((customer) => customer.phoneNumber === phone);
+      if (exactMatch) {
+        return exactMatch;
+      }
+    } catch (err) {
+      LogEngine.debug("Failed to find customer by phone", {
+        phone,
+        path,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return null;
+}
+
 // Create a new customer in Unthread
 // Following the pattern: {phone@whatsapp.user} as dummy email
 export async function createCustomer(
   phone: string,
   name: string,
+  email: string,
 ): Promise<UnthreadCustomer> {
-  const cleanPhone = phone.replace(/[^0-9]/g, "");
-  const email = `${cleanPhone}@whatsapp.user`;
-
   return request<UnthreadCustomer>("POST", "/customers", {
     name: `[WhatsApp] ${name}`,
     email,
     phoneNumber: phone,
   });
+}
+
+export function resolveCustomerEmail(email: string | null | undefined, phone: string): string {
+  const normalizedEmail = typeof email === "string" ? email.trim() : "";
+  if (normalizedEmail) {
+    return normalizedEmail;
+  }
+
+  const fallbackEmail = buildWhatsAppFallbackEmail(phone);
+  if (!fallbackEmail) {
+    throw new Error("Unable to resolve customer email without a valid WhatsApp phone number");
+  }
+
+  return fallbackEmail;
 }
 
 // Create a new conversation (ticket) for a customer
@@ -106,36 +136,25 @@ export async function addMessage(
   message: string,
   onBehalfOf: { email: string; name: string },
 ): Promise<UnthreadMessage> {
-  return request<UnthreadMessage>(
-    "POST",
-    `/conversations/${conversationId}/messages`,
-    {
-      body: {
-        type: "markdown",
-        value: message,
-      },
-      onBehalfOf: {
-        email: onBehalfOf.email,
-        name: onBehalfOf.name,
-      },
+  return request<UnthreadMessage>("POST", `/conversations/${conversationId}/messages`, {
+    body: {
+      type: "markdown",
+      value: message,
     },
-  );
+    onBehalfOf: {
+      email: onBehalfOf.email,
+      name: onBehalfOf.name,
+    },
+  });
 }
 
 // Get a conversation by ID
-export async function getConversation(
-  conversationId: string,
-): Promise<UnthreadConversation> {
-  return request<UnthreadConversation>(
-    "GET",
-    `/conversations/${conversationId}`,
-  );
+export async function getConversation(conversationId: string): Promise<UnthreadConversation> {
+  return request<UnthreadConversation>("GET", `/conversations/${conversationId}`);
 }
 
 // Get customer by ID
-export async function getCustomer(
-  customerId: string,
-): Promise<UnthreadCustomer> {
+export async function getCustomer(customerId: string): Promise<UnthreadCustomer> {
   return request<UnthreadCustomer>("GET", `/customers/${customerId}`);
 }
 
@@ -150,9 +169,7 @@ export async function findOpenConversationByCustomer(
     );
 
     // Reuse any active customer-facing conversation status.
-    const open = conversations.find(
-      (c) => isReusableConversationStatus(c.status),
-    );
+    const open = conversations.find((c) => isReusableConversationStatus(c.status));
 
     return open ?? null;
   } catch (err) {

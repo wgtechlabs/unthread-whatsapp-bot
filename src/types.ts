@@ -63,6 +63,7 @@ export interface CustomerMapping {
   customerId: string;
   conversationId: string | null;
   profileName: string | null;
+  email: string | null;
 }
 
 export interface WhatsAppCustomerRecord extends CustomerMapping {
@@ -76,6 +77,14 @@ export interface WhatsAppTicketRecord {
   phone: string;
   friendlyId: string | null;
   status: string | null;
+  profileName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WhatsAppEmailCollectionState {
+  phone: string;
+  initialMessage: string;
   profileName: string | null;
   createdAt: string;
   updatedAt: string;

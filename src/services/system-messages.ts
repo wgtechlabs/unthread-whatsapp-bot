@@ -1,12 +1,14 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
+import { resolveStatusTemplateKey, type StatusTemplateKey } from "./system-message-status";
 import { sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
 
 function sanitizeTicketNumber(value: unknown): string {
-  const normalized = typeof value === "string"
-    ? value
-    : typeof value === "number" || typeof value === "bigint"
-      ? String(value)
-      : "";
+  const normalized =
+    typeof value === "string"
+      ? value
+      : typeof value === "number" || typeof value === "bigint"
+        ? String(value)
+        : "";
 
   const sanitized = normalized.replace(/[^a-zA-Z0-9\-_]/g, "");
   return sanitized || "unknown";
@@ -18,6 +20,21 @@ export function resolveTicketNumber(friendlyId?: unknown, conversationId?: strin
 }
 
 const templates = {
+  email_prompt: [
+    "*Before we create your ticket*",
+    "",
+    "Please reply with your email address so our team can identify you correctly in Unthread.",
+    "",
+    "If you'd rather skip this step, reply with *cancel* and we'll continue without an email.",
+  ].join("\n"),
+
+  email_prompt_retry: [
+    "*Email address required*",
+    "",
+    "That doesn't look like a valid email address.",
+    "Please reply with a valid email or send *cancel* to continue without one.",
+  ].join("\n"),
+
   ticket_created: [
     "*Support Ticket Created*",
     "",
@@ -50,10 +67,10 @@ const templates = {
     "",
     "Ticket #{{ticketNumber}} is now active again. An agent will follow up shortly.",
   ].join("\n"),
-
 } as const;
 
 type TemplateKey = keyof typeof templates;
+const ensureTemplateKey = (key: StatusTemplateKey): TemplateKey => key;
 
 function renderTemplate(key: TemplateKey, variables: Record<string, string>): string {
   let content: string = templates[key];
@@ -95,49 +112,30 @@ export async function sendStatusChangeMessage(
   newStatus: string,
   previousStatus?: string,
 ): Promise<boolean> {
-  // Caller is expected to normalize, but we lowercase defensively since this is exported
-  const status = newStatus.toLowerCase();
-  const prevStatus = previousStatus?.toLowerCase() ?? "";
   const safe = sanitizeTicketNumber(ticketNumber);
 
-  let templateKey: TemplateKey;
-
-  switch (status) {
-    case "closed":
-    case "resolved":
-      templateKey = "ticket_closed";
-      break;
-    case "on_hold":
-    case "on-hold":
-    case "waiting":
-      templateKey = "ticket_on_hold";
-      break;
-    case "open":
-      // Distinguish "resumed from hold" vs generic reopen
-      if (prevStatus === "on_hold" || prevStatus === "on-hold" || prevStatus === "waiting") {
-        templateKey = "ticket_resumed";
-      } else {
-        // Status changed to open but not from on_hold — no system message needed
-        // (e.g., initial open is handled by sendTicketCreatedMessage)
-        LogEngine.debug("Skipping system message for status change to open (not from hold)", {
-          newStatus,
-          previousStatus,
-        });
-        return false;
-      }
-      break;
-    case "in_progress":
-      if (prevStatus === "on_hold" || prevStatus === "on-hold" || prevStatus === "waiting") {
-        templateKey = "ticket_resumed";
-      } else {
-        templateKey = "ticket_in_progress";
-      }
-      break;
-    default:
+  const statusTemplateKey = resolveStatusTemplateKey(newStatus, previousStatus);
+  const templateKey = statusTemplateKey ? ensureTemplateKey(statusTemplateKey) : null;
+  if (!templateKey) {
+    if (newStatus.toLowerCase().replace(/-/g, "_") === "open") {
+      LogEngine.debug("Skipping system message for status change to open (not from hold)", {
+        newStatus,
+        previousStatus,
+      });
+    } else {
       LogEngine.debug("Unknown status for system message, skipping", { newStatus });
-      return false;
+    }
+    return false;
   }
 
   const message = renderTemplate(templateKey, { ticketNumber: safe });
   return sendSystemMessage(phone, message);
+}
+
+export async function sendEmailPromptMessage(
+  phone: string,
+  options?: { retry?: boolean },
+): Promise<boolean> {
+  const templateKey: TemplateKey = options?.retry ? "email_prompt_retry" : "email_prompt";
+  return sendSystemMessage(phone, renderTemplate(templateKey, {}));
 }

@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import express from "express";
-import { NuvexClient } from "@wgtechlabs/nuvex";
-import type { NuvexConfig, StorageOptions } from "@wgtechlabs/nuvex";
 import { LogEngine, LogMode } from "@wgtechlabs/log-engine";
+import type { NuvexConfig, StorageOptions } from "@wgtechlabs/nuvex";
+import { NuvexClient } from "@wgtechlabs/nuvex";
+import express from "express";
 import { config } from "./config";
-import { setStorage } from "./services/customer-store";
 import { twilioWebhookRouter } from "./routes/twilio-webhook";
+import { setStorage } from "./services/customer-store";
 import { UnthreadWebhookConsumer } from "./services/unthread-webhook-consumer";
 
 // Read bot version from package.json
@@ -14,11 +14,12 @@ const pkg = JSON.parse(readFileSync(resolve(import.meta.dir, "../package.json"),
 const BOT_VERSION: string = pkg.version;
 
 LogEngine.configure({
-  mode: config.nodeEnv === "production"
-    ? LogMode.INFO
-    : config.nodeEnv === "test"
-      ? LogMode.ERROR
-      : LogMode.DEBUG,
+  mode:
+    config.nodeEnv === "production"
+      ? LogMode.INFO
+      : config.nodeEnv === "test"
+        ? LogMode.ERROR
+        : LogMode.DEBUG,
 });
 
 async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
@@ -62,7 +63,9 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
     defaultWriteOk = await storage.set(diagnosticsKey, diagnosticsValue, diagnosticsWriteOptions);
     LogEngine.info("Storage diagnostics: write test", { diagnosticsKey, writeOk: defaultWriteOk });
 
-    const persistentRead = await storage.get<typeof diagnosticsValue>(diagnosticsKey, { skipCache: true });
+    const persistentRead = await storage.get<typeof diagnosticsValue>(diagnosticsKey, {
+      skipCache: true,
+    });
     LogEngine.info("Storage diagnostics: persistent read test", {
       diagnosticsKey,
       readOk: persistentRead !== null,
@@ -75,7 +78,15 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
     });
   } finally {
     if (defaultWriteOk) {
-      const deleteOk = await storage.delete(diagnosticsKey);
+      let deleteOk = false;
+      try {
+        deleteOk = await storage.delete(diagnosticsKey);
+      } catch (error) {
+        LogEngine.error("Storage diagnostics: delete test failed", {
+          diagnosticsKey,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       LogEngine.info("Storage diagnostics: delete test", { diagnosticsKey, deleteOk });
     }
   }
@@ -87,10 +98,14 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
       : diagnosticsWriteOptions;
     let layerWriteOk = false;
     try {
-      layerWriteOk = await storage.set(layerKey, {
-        ...diagnosticsValue,
-        layer: layerTest.label,
-      }, layerWriteOptions);
+      layerWriteOk = await storage.set(
+        layerKey,
+        {
+          ...diagnosticsValue,
+          layer: layerTest.label,
+        },
+        layerWriteOptions,
+      );
 
       const readValue = await storage.get<typeof diagnosticsValue & { layer: string }>(
         layerKey,
@@ -112,10 +127,19 @@ async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
       });
     } finally {
       if (layerWriteOk) {
-        const deleteOk = await storage.delete(
-          layerKey,
-          layerTest.layer ? { layer: layerTest.layer as never } : {},
-        );
+        let deleteOk = false;
+        try {
+          deleteOk = await storage.delete(
+            layerKey,
+            layerTest.layer ? { layer: layerTest.layer as never } : {},
+          );
+        } catch (error) {
+          LogEngine.error("Storage diagnostics: layer cleanup failed", {
+            layer: layerTest.label,
+            layerKey,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
 
         LogEngine.info("Storage diagnostics: layer cleanup", {
           layer: layerTest.label,
@@ -175,7 +199,12 @@ async function bootstrap() {
 
   app.get("/health", async (_req, res) => {
     const health = await storage.healthCheck();
-    res.json({ status: "ok", version: BOT_VERSION, storage: health, timestamp: new Date().toISOString() });
+    res.json({
+      status: "ok",
+      version: BOT_VERSION,
+      storage: health,
+      timestamp: new Date().toISOString(),
+    });
   });
 
   app.use("/webhooks/twilio", twilioWebhookRouter);

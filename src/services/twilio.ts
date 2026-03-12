@@ -1,14 +1,11 @@
-import Twilio from "twilio";
 import { LogEngine } from "@wgtechlabs/log-engine";
+import Twilio from "twilio";
 import { config } from "../config";
 
 const client = Twilio(config.twilio.accountSid, config.twilio.authToken);
 
 // Send a WhatsApp message back to the user via Twilio
-export async function sendWhatsAppMessage(
-  to: string,
-  body: string,
-): Promise<string> {
+export async function sendWhatsAppMessage(to: string, body: string): Promise<string> {
   const message = await client.messages.create({
     from: config.twilio.whatsappNumber,
     to,
@@ -38,10 +35,5 @@ export function validateTwilioSignature(
   params: Record<string, string>,
   signature: string,
 ): boolean {
-  return Twilio.validateRequest(
-    config.twilio.authToken,
-    signature,
-    url,
-    params,
-  );
+  return Twilio.validateRequest(config.twilio.authToken, signature, url, params);
 }
