@@ -1,4 +1,5 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
+import { isReusableConversationStatus } from "../types";
 import type { CustomerMapping } from "../types";
 import * as unthread from "./unthread";
 import { buildWhatsAppFallbackEmail, formatWhatsAppIdentity } from "./whatsapp-identity";
@@ -12,15 +13,6 @@ import {
   storeTicket,
 } from "./whatsapp-store";
 
-function isReusableConversationStatus(status: string | null | undefined): boolean {
-  return (
-    status === "open" ||
-    status === "waiting" ||
-    status === "on_hold" ||
-    status === "on-hold" ||
-    status === "in_progress"
-  );
-}
 
 export function setStorage(client: Parameters<typeof initializeWhatsAppStore>[0]): void {
   initializeWhatsAppStore(client);

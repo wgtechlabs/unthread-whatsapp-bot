@@ -1,5 +1,6 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
+import { isReusableConversationStatus } from "../types";
 import type { UnthreadConversation, UnthreadCustomer, UnthreadMessage } from "../types";
 import { buildWhatsAppFallbackEmail } from "./whatsapp-identity";
 
@@ -8,15 +9,6 @@ const headers = {
   "X-API-KEY": config.unthread.apiKey,
 };
 
-function isReusableConversationStatus(status: string | undefined): boolean {
-  return (
-    status === "open" ||
-    status === "waiting" ||
-    status === "on_hold" ||
-    status === "on-hold" ||
-    status === "in_progress"
-  );
-}
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const url = `${config.unthread.apiUrl}${path}`;

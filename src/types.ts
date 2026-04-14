@@ -1,3 +1,14 @@
+// Returns true for conversation statuses that can still receive new messages
+export function isReusableConversationStatus(status: string | null | undefined): boolean {
+  return (
+    status === "open" ||
+    status === "waiting" ||
+    status === "on_hold" ||
+    status === "on-hold" ||
+    status === "in_progress"
+  );
+}
+
 // Twilio incoming WhatsApp message payload
 export interface TwilioIncomingMessage {
   MessageSid: string;
