@@ -96,6 +96,10 @@ async function forwardWithFallbackEmail(
   }
 }
 
+function sendEmptyTwiML(res: Response, status = 200): void {
+  res.status(status).type("text/xml").send("<Response></Response>");
+}
+
 export const twilioWebhookRouter = Router();
 
 // Validate that the request genuinely came from Twilio by checking the
@@ -104,7 +108,7 @@ twilioWebhookRouter.use((req: Request, res: Response, next: NextFunction) => {
   const signature = req.headers["x-twilio-signature"];
   if (typeof signature !== "string" || !signature) {
     LogEngine.warn("Twilio webhook rejected: missing X-Twilio-Signature header");
-    res.status(403).type("text/xml").send("<Response></Response>");
+    sendEmptyTwiML(res, 403);
     return;
   }
   if (
@@ -115,7 +119,7 @@ twilioWebhookRouter.use((req: Request, res: Response, next: NextFunction) => {
     )
   ) {
     LogEngine.warn("Twilio webhook rejected: invalid signature");
-    res.status(403).type("text/xml").send("<Response></Response>");
+    sendEmptyTwiML(res, 403);
     return;
   }
   next();
@@ -135,7 +139,7 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     // Respond with empty TwiML first to close the Twilio session.
     // System messages must be sent AFTER the response so the REST API call
     // doesn't conflict with the active webhook session.
-    res.type("text/xml").send("<Response></Response>");
+    sendEmptyTwiML(res);
 
     const pendingEmailCollection = await getEmailCollectionState(phone);
     if (pendingEmailCollection) {
@@ -295,7 +299,7 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     });
 
     if (!res.headersSent) {
-      res.type("text/xml").send("<Response></Response>");
+      sendEmptyTwiML(res);
     }
   }
 });
