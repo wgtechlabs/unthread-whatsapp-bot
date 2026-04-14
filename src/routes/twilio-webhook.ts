@@ -1,6 +1,7 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
+import { config } from "../config";
 import {
   findExistingCustomer,
   resolveConversation,
@@ -11,7 +12,7 @@ import {
   sendEmailPromptMessage,
   sendTicketCreatedMessage,
 } from "../services/system-messages";
-import { extractPhone } from "../services/twilio";
+import { extractPhone, validateTwilioSignature } from "../services/twilio";
 import * as unthread from "../services/unthread";
 import {
   formatWhatsAppIdentity,
@@ -95,7 +96,34 @@ async function forwardWithFallbackEmail(
   }
 }
 
+function sendEmptyTwiML(res: Response, status = 200): void {
+  res.status(status).type("text/xml").send("<Response></Response>");
+}
+
 export const twilioWebhookRouter = Router();
+
+// Validate that the request genuinely came from Twilio by checking the
+// X-Twilio-Signature header before any message processing occurs.
+twilioWebhookRouter.use((req: Request, res: Response, next: NextFunction) => {
+  const signature = req.headers["x-twilio-signature"];
+  if (typeof signature !== "string" || !signature) {
+    LogEngine.warn("Twilio webhook rejected: missing X-Twilio-Signature header");
+    sendEmptyTwiML(res, 403);
+    return;
+  }
+  if (
+    !validateTwilioSignature(
+      config.twilio.webhookUrl,
+      req.body as Record<string, string>,
+      signature,
+    )
+  ) {
+    LogEngine.warn("Twilio webhook rejected: invalid signature");
+    sendEmptyTwiML(res, 403);
+    return;
+  }
+  next();
+});
 
 // POST /webhooks/twilio
 // Receives incoming WhatsApp messages from Twilio
@@ -111,7 +139,7 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     // Respond with empty TwiML first to close the Twilio session.
     // System messages must be sent AFTER the response so the REST API call
     // doesn't conflict with the active webhook session.
-    res.type("text/xml").send("<Response></Response>");
+    sendEmptyTwiML(res);
 
     const pendingEmailCollection = await getEmailCollectionState(phone);
     if (pendingEmailCollection) {
@@ -271,7 +299,7 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     });
 
     if (!res.headersSent) {
-      res.type("text/xml").send("<Response></Response>");
+      sendEmptyTwiML(res);
     }
   }
 });
