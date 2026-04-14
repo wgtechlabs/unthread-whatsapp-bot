@@ -1,6 +1,7 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
+import { config } from "../config";
 import {
   findExistingCustomer,
   resolveConversation,
@@ -11,7 +12,7 @@ import {
   sendEmailPromptMessage,
   sendTicketCreatedMessage,
 } from "../services/system-messages";
-import { extractPhone } from "../services/twilio";
+import { extractPhone, validateTwilioSignature } from "../services/twilio";
 import * as unthread from "../services/unthread";
 import {
   formatWhatsAppIdentity,
@@ -96,6 +97,29 @@ async function forwardWithFallbackEmail(
 }
 
 export const twilioWebhookRouter = Router();
+
+// Validate that the request genuinely came from Twilio by checking the
+// X-Twilio-Signature header before any message processing occurs.
+twilioWebhookRouter.use((req: Request, res: Response, next: NextFunction) => {
+  const signature = req.headers["x-twilio-signature"];
+  if (typeof signature !== "string" || !signature) {
+    LogEngine.warn("Twilio webhook rejected: missing X-Twilio-Signature header");
+    res.status(403).type("text/xml").send("<Response></Response>");
+    return;
+  }
+  if (
+    !validateTwilioSignature(
+      config.twilio.webhookUrl,
+      req.body as Record<string, string>,
+      signature,
+    )
+  ) {
+    LogEngine.warn("Twilio webhook rejected: invalid signature");
+    res.status(403).type("text/xml").send("<Response></Response>");
+    return;
+  }
+  next();
+});
 
 // POST /webhooks/twilio
 // Receives incoming WhatsApp messages from Twilio

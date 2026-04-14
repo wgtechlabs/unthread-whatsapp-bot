@@ -62,6 +62,7 @@ export const config = {
     accountSid: requireEnv("TWILIO_ACCOUNT_SID"),
     authToken: requireEnv("TWILIO_AUTH_TOKEN"),
     whatsappNumber: requireEnv("TWILIO_WHATSAPP_NUMBER"),
+    webhookUrl: requireEnv("TWILIO_WEBHOOK_URL"),
   },
 
   unthread: {
