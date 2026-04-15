@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.2.3] - 2026-04-15
+
+### Security
+
+- add Dockerfile HEALTHCHECK instruction (#4) (#5)
+
 ## [1.2.2] - 2026-04-15
 
 ### Changed
