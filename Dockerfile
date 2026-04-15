@@ -31,5 +31,8 @@ USER app
 
 EXPOSE 3000
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD wget --quiet --spider --tries=1 http://localhost:3000/health || exit 1
+
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["bun", "src/index.ts"]
