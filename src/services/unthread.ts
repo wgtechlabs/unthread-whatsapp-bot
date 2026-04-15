@@ -1,7 +1,7 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
-import { isReusableConversationStatus } from "../types";
 import type { UnthreadConversation, UnthreadCustomer, UnthreadMessage } from "../types";
+import { isReusableConversationStatus } from "../types";
 import { buildWhatsAppFallbackEmail } from "./whatsapp-identity";
 
 const headers = {
@@ -9,6 +9,25 @@ const headers = {
   "X-API-KEY": config.unthread.apiKey,
 };
 
+export class UnthreadApiError extends Error {
+  readonly status: number;
+  readonly responseBody: string;
+
+  constructor(method: string, path: string, status: number, responseBody: string) {
+    super(`Unthread API ${method} ${path} failed (${status}): ${responseBody}`);
+    this.name = "UnthreadApiError";
+    this.status = status;
+    this.responseBody = responseBody;
+  }
+}
+
+export function isUnthreadApiNotFoundError(error: unknown): error is UnthreadApiError {
+  return error instanceof UnthreadApiError && error.status === 404;
+}
+
+function isFallbackLookupError(error: unknown): error is UnthreadApiError {
+  return error instanceof UnthreadApiError && (error.status === 400 || error.status === 404);
+}
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const url = `${config.unthread.apiUrl}${path}`;
@@ -23,7 +42,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Unthread API ${method} ${path} failed (${res.status}): ${text}`);
+    throw new UnthreadApiError(method, path, res.status, text);
   }
 
   const data = (await res.json()) as T;
@@ -33,19 +52,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 // Search for existing customer by email
 export async function findCustomerByEmail(email: string): Promise<UnthreadCustomer | null> {
-  try {
-    const customers = await request<UnthreadCustomer[]>(
-      "GET",
-      `/customers?email=${encodeURIComponent(email)}`,
-    );
-    return customers.length > 0 ? customers[0] : null;
-  } catch (err) {
-    LogEngine.debug("Failed to find customer by email", {
-      email,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
+  const customers = await request<UnthreadCustomer[]>(
+    "GET",
+    `/customers?email=${encodeURIComponent(email)}`,
+  );
+  return customers.length > 0 ? customers[0] : null;
 }
 
 export async function findCustomerByPhone(phone: string): Promise<UnthreadCustomer | null> {
@@ -62,11 +73,21 @@ export async function findCustomerByPhone(phone: string): Promise<UnthreadCustom
         return exactMatch;
       }
     } catch (err) {
-      LogEngine.debug("Failed to find customer by phone", {
+      if (isFallbackLookupError(err)) {
+        LogEngine.debug("Phone lookup path unavailable, trying fallback", {
+          phone,
+          path,
+          status: err.status,
+        });
+        continue;
+      }
+
+      LogEngine.error("Failed to find customer by phone", {
         phone,
         path,
         error: err instanceof Error ? err.message : String(err),
       });
+      throw err;
     }
   }
 
@@ -153,21 +174,13 @@ export async function getCustomer(customerId: string): Promise<UnthreadCustomer>
 export async function findOpenConversationByCustomer(
   customerId: string,
 ): Promise<UnthreadConversation | null> {
-  try {
-    const conversations = await request<UnthreadConversation[]>(
-      "GET",
-      `/conversations?customerId=${encodeURIComponent(customerId)}`,
-    );
+  const conversations = await request<UnthreadConversation[]>(
+    "GET",
+    `/conversations?customerId=${encodeURIComponent(customerId)}`,
+  );
 
-    // Reuse any active customer-facing conversation status.
-    const open = conversations.find((c) => isReusableConversationStatus(c.status));
+  // Reuse any active customer-facing conversation status.
+  const open = conversations.find((c) => isReusableConversationStatus(c.status));
 
-    return open ?? null;
-  } catch (err) {
-    LogEngine.debug("Failed to find open conversation for customer", {
-      customerId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
+  return open ?? null;
 }

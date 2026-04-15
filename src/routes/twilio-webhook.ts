@@ -7,6 +7,7 @@ import {
   resolveConversation,
   resolveCustomer,
 } from "../services/customer-store";
+import { recoverFromEmailPromptFailure } from "../services/email-prompt-recovery";
 import {
   resolveTicketNumber,
   sendEmailPromptMessage,
@@ -96,6 +97,24 @@ async function forwardWithFallbackEmail(
   }
 }
 
+async function recoverPromptFailureWithFallback(
+  phone: string,
+  profileName: string | null,
+  initialMessage: string,
+  stage: "initial" | "retry",
+  error?: unknown,
+): Promise<void> {
+  await recoverFromEmailPromptFailure({
+    phone,
+    profileName,
+    initialMessage,
+    stage,
+    error,
+    clearPendingState: async () => clearEmailCollectionState(phone),
+    forwardFallback: async () => forwardWithFallbackEmail(phone, profileName, initialMessage),
+  });
+}
+
 function sendEmptyTwiML(res: Response, status = 200): void {
   res.status(status).type("text/xml").send("<Response></Response>");
 }
@@ -173,12 +192,25 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
 
       const email = normalizeEmail(body);
       if (!email) {
-        sendEmailPromptMessage(phone, { retry: true }).catch((err) => {
-          LogEngine.warn("Failed to send email retry prompt", {
+        try {
+          const promptSent = await sendEmailPromptMessage(phone, { retry: true });
+          if (!promptSent) {
+            await recoverPromptFailureWithFallback(
+              phone,
+              profileName ?? pendingEmailCollection.profileName,
+              pendingEmailCollection.initialMessage,
+              "retry",
+            );
+          }
+        } catch (error) {
+          await recoverPromptFailureWithFallback(
             phone,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
+            profileName ?? pendingEmailCollection.profileName,
+            pendingEmailCollection.initialMessage,
+            "retry",
+            error,
+          );
+        }
         return;
       }
 
@@ -231,39 +263,10 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
       try {
         const promptSent = await sendEmailPromptMessage(phone);
         if (!promptSent) {
-          const rolledBack = await clearEmailCollectionState(phone);
-          LogEngine.warn(
-            "Failed to send initial email prompt; rolled back pending email collection",
-            {
-              phone,
-              profileName,
-              rolledBack,
-            },
-          );
+          await recoverPromptFailureWithFallback(phone, profileName, body, "initial");
         }
       } catch (error) {
-        try {
-          const rolledBack = await clearEmailCollectionState(phone);
-          if (!rolledBack) {
-            LogEngine.error("Failed to roll back pending email collection after prompt failure", {
-              phone,
-              profileName,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-        } catch (rollbackError) {
-          LogEngine.error("Failed to roll back pending email collection after prompt failure", {
-            phone,
-            profileName,
-            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-          });
-        }
-
-        LogEngine.error("Failed to send initial email prompt", {
-          phone,
-          profileName,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        await recoverPromptFailureWithFallback(phone, profileName, body, "initial", error);
       }
       return;
     }
