@@ -1,6 +1,6 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
-import { isReusableConversationStatus } from "../types";
 import type { CustomerMapping } from "../types";
+import { isReusableConversationStatus } from "../types";
 import * as unthread from "./unthread";
 import { buildWhatsAppFallbackEmail, formatWhatsAppIdentity } from "./whatsapp-identity";
 import {
@@ -12,7 +12,6 @@ import {
   storeCustomer,
   storeTicket,
 } from "./whatsapp-store";
-
 
 export function setStorage(client: Parameters<typeof initializeWhatsAppStore>[0]): void {
   initializeWhatsAppStore(client);
@@ -197,11 +196,21 @@ export async function resolveConversation(
       });
       mapping.conversationId = updatedCustomer.conversationId;
     } catch (err) {
-      LogEngine.debug("Failed to fetch stored conversation, will search for open ones", {
+      if (!unthread.isUnthreadApiNotFoundError(err)) {
+        throw err;
+      }
+
+      LogEngine.debug("Stored conversation no longer exists, clearing stale reference", {
         conversationId: mapping.conversationId,
-        error: err instanceof Error ? err.message : String(err),
       });
-      mapping.conversationId = null;
+      const updatedCustomer = await storeCustomer({
+        ...((await getCustomerById(mapping.customerId)) ?? mapping),
+        phone: mapping.phone,
+        customerId: mapping.customerId,
+        conversationId: null,
+        profileName: mapping.profileName,
+      });
+      mapping.conversationId = updatedCustomer.conversationId;
     }
   }
 
