@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Note: these permissions apply to the built-in GITHUB_TOKEN only.
+# GH_PAT is a Personal Access Token and is not constrained by this block.
+# Required PAT scopes: contents (write), pull-requests (write), workflow.
 permissions:
   contents: write
   pull-requests: write
@@ -14,6 +17,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Verify GH_PAT is set
+        run: |
+          if [ -z "${{ secrets.GH_PAT }}" ]; then
+            echo "::error::GH_PAT secret is not set. A Personal Access Token with 'contents' (write), 'pull-requests' (write), and 'workflow' scopes is required to trigger downstream workflows."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -24,6 +34,7 @@ jobs:
         uses: wgtechlabs/release-build-flow-action@v1.7.0
         with:
           # Use GH_PAT to allow downstream release-triggered workflows.
+          # Required PAT scopes: contents (write), pull-requests (write), workflow.
           github-token: ${{ secrets.GH_PAT }}
           commit-convention: clean-commit
 
