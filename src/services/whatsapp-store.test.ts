@@ -88,3 +88,62 @@ describe("clearEmailCollectionState", () => {
     await expect(getEmailCollectionState(phone)).resolves.toBeNull();
   });
 });
+
+describe("storeEmailCollectionState with pendingAttachments", () => {
+  beforeEach(() => {
+    initializeWhatsAppStore(new MockStorageClient() as never);
+  });
+
+  test("stores and retrieves pending attachment metadata", async () => {
+    const phone = "+15550000010";
+    const pendingAttachments = [
+      {
+        mediaUrl: "https://api.twilio.com/Accounts/AC001/Messages/MM001/Media/ME001",
+        contentType: "image/jpeg",
+        fileName: "image.jpg",
+      },
+    ];
+
+    await storeEmailCollectionState({
+      phone,
+      initialMessage: "Check this image",
+      profileName: "User",
+      pendingAttachments,
+    });
+
+    const state = await getEmailCollectionState(phone);
+    expect(state).not.toBeNull();
+    expect(state?.pendingAttachments).toHaveLength(1);
+    expect(state?.pendingAttachments?.[0].contentType).toBe("image/jpeg");
+    expect(state?.pendingAttachments?.[0].fileName).toBe("image.jpg");
+  });
+
+  test("returns valid state when pendingAttachments is omitted", async () => {
+    const phone = "+15550000011";
+
+    await storeEmailCollectionState({
+      phone,
+      initialMessage: "Text only message",
+      profileName: null,
+    });
+
+    const state = await getEmailCollectionState(phone);
+    expect(state).not.toBeNull();
+    expect(state?.pendingAttachments).toBeUndefined();
+  });
+
+  test("returns valid state with empty pendingAttachments array", async () => {
+    const phone = "+15550000012";
+
+    await storeEmailCollectionState({
+      phone,
+      initialMessage: "Nothing attached",
+      profileName: null,
+      pendingAttachments: [],
+    });
+
+    const state = await getEmailCollectionState(phone);
+    expect(state).not.toBeNull();
+    expect(state?.pendingAttachments).toHaveLength(0);
+  });
+});

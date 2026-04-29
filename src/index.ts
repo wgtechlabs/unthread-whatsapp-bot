@@ -5,8 +5,10 @@ import type { NuvexConfig, StorageOptions } from "@wgtechlabs/nuvex";
 import { NuvexClient } from "@wgtechlabs/nuvex";
 import express from "express";
 import { config } from "./config";
+import { mediaProxyRouter } from "./routes/media-proxy";
 import { twilioWebhookRouter } from "./routes/twilio-webhook";
 import { setStorage } from "./services/customer-store";
+import { initializeMediaProxyStore } from "./services/media-proxy-store";
 import { UnthreadWebhookConsumer } from "./services/unthread-webhook-consumer";
 
 // Read bot version from package.json
@@ -174,6 +176,7 @@ async function bootstrap() {
 
   const storage = await NuvexClient.initialize(nuvexConfig);
   setStorage(storage);
+  initializeMediaProxyStore(storage);
   LogEngine.info("Storage: Nuvex initialized");
   logStorageDiagnostics(storage).catch((err) => {
     LogEngine.error("Storage diagnostics failed", {
@@ -208,10 +211,12 @@ async function bootstrap() {
   });
 
   app.use("/webhooks/twilio", twilioWebhookRouter);
+  app.use("/media", mediaProxyRouter);
 
   app.listen(config.port, () => {
     LogEngine.log(`Unthread WhatsApp Bot v${BOT_VERSION} running on port ${config.port}`);
     LogEngine.info("Twilio webhook:   POST /webhooks/twilio");
+    LogEngine.info("Media proxy:      GET  /media/:token");
     LogEngine.info("Health check:     GET  /health");
   });
 

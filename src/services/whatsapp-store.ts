@@ -97,21 +97,40 @@ function isValidCustomerRecord(value: unknown): value is WhatsAppCustomerRecord 
   );
 }
 
+function isValidPendingAttachmentMeta(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.mediaUrl === "string" &&
+    typeof record.contentType === "string" &&
+    typeof record.fileName === "string"
+  );
+}
+
 function isValidEmailCollectionState(value: unknown): value is WhatsAppEmailCollectionState {
   if (!value || typeof value !== "object") {
     return false;
   }
 
   const record = value as Record<string, unknown>;
-  return (
+
+  const baseValid =
     isNonEmptyString(record.phone) &&
     typeof record.initialMessage === "string" &&
     (record.profileName === null ||
       record.profileName === undefined ||
       typeof record.profileName === "string") &&
     isNonEmptyString(record.createdAt) &&
-    isNonEmptyString(record.updatedAt)
-  );
+    isNonEmptyString(record.updatedAt);
+
+  if (!baseValid) return false;
+
+  if (record.pendingAttachments !== undefined && record.pendingAttachments !== null) {
+    if (!Array.isArray(record.pendingAttachments)) return false;
+    if (!record.pendingAttachments.every(isValidPendingAttachmentMeta)) return false;
+  }
+
+  return true;
 }
 
 function isValidTicketRecord(value: unknown): value is WhatsAppTicketRecord {

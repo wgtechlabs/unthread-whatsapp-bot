@@ -19,6 +19,43 @@ export interface TwilioIncomingMessage {
   NumMedia: string;
   ProfileName?: string;
   WaId?: string; // WhatsApp ID (phone number without +)
+  // Dynamic media fields for up to 10 attachments (Twilio WhatsApp media)
+  MediaUrl0?: string;
+  MediaUrl1?: string;
+  MediaUrl2?: string;
+  MediaUrl3?: string;
+  MediaUrl4?: string;
+  MediaUrl5?: string;
+  MediaUrl6?: string;
+  MediaUrl7?: string;
+  MediaUrl8?: string;
+  MediaUrl9?: string;
+  MediaContentType0?: string;
+  MediaContentType1?: string;
+  MediaContentType2?: string;
+  MediaContentType3?: string;
+  MediaContentType4?: string;
+  MediaContentType5?: string;
+  MediaContentType6?: string;
+  MediaContentType7?: string;
+  MediaContentType8?: string;
+  MediaContentType9?: string;
+}
+
+// A single inbound media attachment downloaded from Twilio
+export interface InboundAttachment {
+  buffer: Buffer;
+  mimeType: string;
+  fileName: string;
+  sizeBytes: number;
+  originalMediaUrl: string; // Original Twilio media URL for deferred re-download
+}
+
+// Metadata stored in pending email collection state for deferred attachment upload
+export interface PendingAttachmentMeta {
+  mediaUrl: string; // Twilio-authenticated media URL (re-downloaded after email capture)
+  contentType: string;
+  fileName: string;
 }
 
 export type UnthreadFriendlyId = string | number;
@@ -46,6 +83,25 @@ export interface UnthreadMessage {
   type: string;
 }
 
+// A single file record from the outbound webhook event (unthread-webhook-server format)
+export interface OutboundFileRecord {
+  id?: string; // Slack-style file ID (e.g. "F12345")
+  name: string;
+  size?: number;
+  mimetype?: string;
+  urlPrivate?: string;
+  urlPrivateDownload?: string;
+}
+
+// Attachment metadata block from unthread-webhook-server
+export interface OutboundAttachmentsMeta {
+  hasFiles: boolean;
+  fileCount: number;
+  totalSize?: number;
+  types?: string[];
+  names?: string[];
+}
+
 // Unthread queued event payload from unthread-webhook-server
 export interface UnthreadQueuedEvent {
   platform?: string;
@@ -64,8 +120,21 @@ export interface UnthreadQueuedEvent {
     status?: string;
     previousStatus?: string;
     friendlyId?: UnthreadFriendlyId;
+    files?: OutboundFileRecord[];
     [key: string]: unknown;
   };
+  attachments?: OutboundAttachmentsMeta;
+}
+
+// Short-lived record stored for a media proxy token
+export interface MediaProxyTokenRecord {
+  token: string;
+  fileId?: string; // Slack-style file ID if present (e.g. "F12345")
+  fileName: string;
+  mimeType: string;
+  fileSize?: number;
+  downloadUrl?: string; // Direct download URL (urlPrivateDownload or urlPrivate)
+  expiresAt: string; // ISO timestamp
 }
 
 // Internal mapping: WhatsApp phone -> Unthread customer
@@ -97,6 +166,7 @@ export interface WhatsAppEmailCollectionState {
   phone: string;
   initialMessage: string;
   profileName: string | null;
+  pendingAttachments?: PendingAttachmentMeta[];
   createdAt: string;
   updatedAt: string;
 }

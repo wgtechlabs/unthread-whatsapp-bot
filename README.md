@@ -4,7 +4,7 @@
 
 [![release workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/release.yml?style=flat-square&logo=github&label=release&labelColor=181717)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/release.yml) [![container workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/container.yml?branch=dev&style=flat-square&logo=github&labelColor=181717&label=container)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/container.yml) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![version](https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&labelColor=181717&color=default&style=flat-square&label=version)](https://github.com/wgtechlabs/unthread-whatsapp-bot/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license)
 
-**Official Unthread Extension** — The Unthread WhatsApp Bot connects your WhatsApp Business number with Unthread's powerful ticket management system via Twilio. Customers message your WhatsApp number, messages flow into Unthread as tickets, and agent replies are sent back to WhatsApp — with automatic system notifications for ticket creation and status changes.
+**Official Unthread Extension** — The Unthread WhatsApp Bot connects your WhatsApp Business number with Unthread's powerful ticket management system via Twilio. Customers message your WhatsApp number, messages and file attachments flow into Unthread as tickets, and agent replies (including attachments) are sent back to WhatsApp — with automatic system notifications for ticket creation and status changes.
 
 This bot is designed for businesses managing customer support through WhatsApp — optimized for professional support workflows with seamless bidirectional communication between your team and customers.
 
@@ -55,6 +55,7 @@ Customers receive automatic notifications for ticket lifecycle events:
 
 - **Seamless Ticket Creation**: Incoming WhatsApp messages automatically create Unthread support tickets
 - **Bidirectional Communication**: Agent replies in Unthread are forwarded back to the customer via WhatsApp
+- **Bidirectional File Attachments**: Customers can send images and documents via WhatsApp; agents can send files from Unthread/dashboard back to WhatsApp customers
 - **System Notifications**: Automatic WhatsApp messages for ticket lifecycle events (created, closed, on hold, resumed)
 - **Customer Management**: Automatic customer profile creation using phone-based identity
 - **Multi-layer Storage**: [Nuvex](https://github.com/wgtechlabs/nuvex)-powered persistence (Memory + Redis + PostgreSQL)
