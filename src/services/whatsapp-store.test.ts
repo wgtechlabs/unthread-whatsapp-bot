@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
+  claimOutboundDelivery,
   clearEmailCollectionState,
   getEmailCollectionState,
   initializeWhatsAppStore,
@@ -7,17 +8,33 @@ import {
 } from "./whatsapp-store";
 
 class MockStorageClient {
-  private readonly records = new Map<string, unknown>();
+  private readonly records = new Map<string, { value: unknown; expiresAt?: number }>();
 
   constructor(private readonly options: { failDelete?: boolean } = {}) {}
 
+  async set(key: string, value: unknown, options?: { ttl?: number }): Promise<boolean> {
+    const expiresAt = options?.ttl ? Date.now() + options.ttl * 1000 : undefined;
+    this.records.set(key, { value, expiresAt });
+    return true;
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    const entry = this.records.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt !== undefined && Date.now() > entry.expiresAt) {
+      this.records.delete(key);
+      return null;
+    }
+    return entry.value as T;
+  }
+
   async setNamespaced(namespace: string, key: string, value: unknown): Promise<boolean> {
-    this.records.set(`${namespace}:${key}`, value);
+    this.records.set(`${namespace}:${key}`, { value });
     return true;
   }
 
   async getNamespaced(namespace: string, key: string): Promise<unknown> {
-    return this.records.get(`${namespace}:${key}`) ?? null;
+    return (await this.get(`${namespace}:${key}`)) ?? null;
   }
 
   async delete(key: string): Promise<boolean> {
@@ -145,5 +162,21 @@ describe("storeEmailCollectionState with pendingAttachments", () => {
     const state = await getEmailCollectionState(phone);
     expect(state).not.toBeNull();
     expect(state?.pendingAttachments).toHaveLength(0);
+  });
+});
+
+describe("claimOutboundDelivery", () => {
+  beforeEach(() => {
+    initializeWhatsAppStore(new MockStorageClient() as never);
+  });
+
+  test("claims a new outbound delivery key once", async () => {
+    await expect(claimOutboundDelivery("fingerprint-1", 120)).resolves.toBe(true);
+    await expect(claimOutboundDelivery("fingerprint-1", 120)).resolves.toBe(false);
+  });
+
+  test("allows different outbound delivery keys", async () => {
+    await expect(claimOutboundDelivery("fingerprint-2", 120)).resolves.toBe(true);
+    await expect(claimOutboundDelivery("fingerprint-3", 120)).resolves.toBe(true);
   });
 });

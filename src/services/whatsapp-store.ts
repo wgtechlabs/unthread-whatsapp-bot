@@ -12,6 +12,7 @@ const NS_TICKET_CONVERSATION = "wa:ticket:conversation";
 const NS_TICKET_FRIENDLY = "wa:ticket:friendly";
 const NS_CONVERSATION_PHONE = "wa:index:conversation-phone";
 const NS_EMAIL_COLLECTION = "wa:email-collection:phone";
+const NS_OUTBOUND_DELIVERY = "wa:outbound:delivery";
 
 const customerByPhoneCache = new Map<string, WhatsAppCustomerRecord>();
 const customerByIdCache = new Map<string, WhatsAppCustomerRecord>();
@@ -19,6 +20,7 @@ const ticketByConversationCache = new Map<string, WhatsAppTicketRecord>();
 const ticketByFriendlyIdCache = new Map<string, WhatsAppTicketRecord>();
 const phoneByConversationCache = new Map<string, string>();
 const emailCollectionCache = new Map<string, WhatsAppEmailCollectionState>();
+const outboundDeliveryCache = new Map<string, number>();
 
 let _storage: NuvexClient;
 
@@ -531,6 +533,41 @@ export async function clearEmailCollectionState(phone: string): Promise<boolean>
   }
 
   emailCollectionCache.delete(phone);
+  return true;
+}
+
+export async function claimOutboundDelivery(
+  deliveryKey: string,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const now = Date.now();
+  const cachedExpiresAt = outboundDeliveryCache.get(deliveryKey);
+  if (cachedExpiresAt && cachedExpiresAt > now) {
+    return false;
+  }
+
+  if (cachedExpiresAt) {
+    outboundDeliveryCache.delete(deliveryKey);
+  }
+
+  const storageKey = namespacedStorageKey(NS_OUTBOUND_DELIVERY, deliveryKey);
+  const expiresAt = new Date(now + ttlSeconds * 1000).toISOString();
+  const claimed = await storage().setIfNotExists(
+    storageKey,
+    {
+      deliveryKey,
+      createdAt: new Date(now).toISOString(),
+      expiresAt,
+    },
+    { ttl: ttlSeconds },
+  );
+
+  if (!claimed) {
+    // Key already existed — another instance already claimed this delivery.
+    return false;
+  }
+
+  outboundDeliveryCache.set(deliveryKey, new Date(expiresAt).getTime());
   return true;
 }
 
