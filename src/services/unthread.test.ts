@@ -20,7 +20,21 @@ describe("unthread service error handling", () => {
     return Object.assign(implementation, originalFetch);
   }
 
+  const originalEnv: Record<string, string | undefined> = {};
+
   beforeAll(async () => {
+    const keys = [
+      "TWILIO_ACCOUNT_SID",
+      "TWILIO_AUTH_TOKEN",
+      "TWILIO_WHATSAPP_NUMBER",
+      "TWILIO_WEBHOOK_URL",
+      "UNTHREAD_API_KEY",
+      "UNTHREAD_SLACK_CHANNEL_ID",
+      "POSTGRES_URL",
+    ];
+    for (const key of keys) {
+      originalEnv[key] = process.env[key];
+    }
     setRequiredEnv();
     unthread = await import("./unthread");
   });
@@ -31,6 +45,13 @@ describe("unthread service error handling", () => {
 
   afterAll(() => {
     globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
   });
 
   test("findCustomerByEmail propagates upstream API failures", async () => {

@@ -203,7 +203,14 @@ export async function resolveConversation(
       LogEngine.debug("Stored conversation no longer exists, clearing stale reference", {
         conversationId: mapping.conversationId,
       });
-      mapping.conversationId = null;
+      const updatedCustomer = await storeCustomer({
+        ...((await getCustomerById(mapping.customerId)) ?? mapping),
+        phone: mapping.phone,
+        customerId: mapping.customerId,
+        conversationId: null,
+        profileName: mapping.profileName,
+      });
+      mapping.conversationId = updatedCustomer.conversationId;
     }
   }
 
