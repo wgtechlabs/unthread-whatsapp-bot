@@ -6,6 +6,7 @@ import { Router } from "express";
 import { config } from "../config";
 import { sanitizeFileName } from "../services/attachment-validator";
 import { getProxyToken } from "../services/media-proxy-store";
+import type { MediaProxyTokenRecord } from "../types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -19,6 +20,20 @@ function isUnthreadApiUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): string | null {
+  if (meta.downloadUrl) {
+    return meta.downloadUrl;
+  }
+
+  if (meta.fileId && meta.conversationId) {
+    return `${config.unthread.apiUrl}/conversations/${encodeURIComponent(
+      meta.conversationId,
+    )}/files/${encodeURIComponent(meta.fileId)}/full`;
+  }
+
+  return null;
 }
 
 export const mediaProxyRouter = Router();
@@ -51,11 +66,9 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
     return;
   }
 
-  // Resolve the download URL. Prefer urlPrivateDownload, fall back to fileId endpoint.
-  let downloadUrl = meta.downloadUrl ?? null;
-  if (!downloadUrl && meta.fileId) {
-    downloadUrl = `${config.unthread.apiUrl}/files/${meta.fileId}/download`;
-  }
+  // Resolve the download URL. Prefer urlPrivateDownload, fall back to Unthread's
+  // conversation-scoped file endpoint.
+  const downloadUrl = resolveMediaProxyDownloadUrl(meta);
 
   if (!downloadUrl) {
     LogEngine.error("Media proxy: no download URL available for token");
@@ -105,7 +118,9 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
     if (fileRes.body) {
       // Convert the Web ReadableStream to a Node Readable and pipe to the
       // response so that backpressure and client aborts are handled correctly.
-      const nodeStream = Readable.fromWeb(fileRes.body as Parameters<typeof Readable.fromWeb>[0]);
+      const nodeStream = Readable.fromWeb(
+        fileRes.body as unknown as Parameters<typeof Readable.fromWeb>[0],
+      );
       await pipeline(nodeStream, res);
     } else {
       const buffer = await fileRes.arrayBuffer();

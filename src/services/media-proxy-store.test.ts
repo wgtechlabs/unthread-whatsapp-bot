@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 function setRequiredEnv(): void {
-  process.env.TWILIO_ACCOUNT_SID = "test-account";
+  process.env.TWILIO_ACCOUNT_SID = "AC00000000000000000000000000000000";
   process.env.TWILIO_AUTH_TOKEN = "test-token";
   process.env.TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155550123";
   process.env.TWILIO_WEBHOOK_URL = "https://example.com/webhooks/twilio";
@@ -124,6 +124,7 @@ describe("media-proxy-store", () => {
   test("storeProxyToken persists fileId and downloadUrl", async () => {
     const token = await proxyStore.storeProxyToken({
       fileId: "F12345ABC",
+      conversationId: "conv_123",
       fileName: "report.pdf",
       mimeType: "application/pdf",
       downloadUrl: "https://files.slack.com/files-pri/T0123/F12345ABC/report.pdf",
@@ -131,6 +132,7 @@ describe("media-proxy-store", () => {
 
     const meta = await proxyStore.getProxyToken(token);
     expect(meta?.fileId).toBe("F12345ABC");
+    expect(meta?.conversationId).toBe("conv_123");
     expect(meta?.downloadUrl).toBe("https://files.slack.com/files-pri/T0123/F12345ABC/report.pdf");
   });
 });
