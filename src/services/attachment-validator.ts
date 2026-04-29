@@ -78,11 +78,14 @@ export function validateAttachmentCount(count: number): AttachmentValidationResu
 }
 
 // Strip dangerous characters from file names and truncate to a safe length.
-// Never returns an empty string — falls back to "attachment".
+// Removes ASCII control characters (including \r/\n) so the result is safe to
+// embed in Content-Disposition headers. Never returns an empty string — falls
+// back to "attachment".
 export function sanitizeFileName(rawName: string): string {
   const base = rawName
     .replace(/[/\\:*?"<>|]/g, "_")
-    .replace(/\0/g, "")
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally strips ASCII control chars for header safety
+    .replace(/[\x00-\x1F\x7F]/g, "")
     .trim();
   return base.slice(0, 200) || "attachment";
 }

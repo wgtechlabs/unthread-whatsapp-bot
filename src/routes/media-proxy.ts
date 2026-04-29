@@ -7,6 +7,18 @@ import { getProxyToken } from "../services/media-proxy-store";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Returns true when the given URL is on the configured Unthread API origin.
+// The X-API-KEY credential must only be forwarded to that origin.
+function isUnthreadApiUrl(url: string): boolean {
+  try {
+    const target = new URL(url);
+    const apiOrigin = new URL(config.unthread.apiUrl);
+    return target.hostname === apiOrigin.hostname;
+  } catch {
+    return false;
+  }
+}
+
 export const mediaProxyRouter = Router();
 
 // GET /media/:token
@@ -50,9 +62,14 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
   }
 
   try {
-    const fileRes = await fetch(downloadUrl, {
-      headers: { "X-API-KEY": config.unthread.apiKey },
-    });
+    // Only attach the Unthread API key when the download URL is on the Unthread
+    // API origin. Sending credentials to an arbitrary host would leak the key
+    // and enable SSRF via attacker-controlled token metadata.
+    const headers: Record<string, string> = isUnthreadApiUrl(downloadUrl)
+      ? { "X-API-KEY": config.unthread.apiKey }
+      : {};
+
+    const fileRes = await fetch(downloadUrl, { headers });
 
     if (!fileRes.ok) {
       LogEngine.error("Media proxy: upstream file fetch failed", {

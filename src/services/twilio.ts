@@ -77,6 +77,19 @@ export async function downloadTwilioMedia(
     throw new Error(`Failed to download Twilio media: HTTP ${response.status}`);
   }
 
+  // Reject early when Content-Length indicates the body will exceed the configured
+  // maximum. This avoids buffering the full response only to discard it, which
+  // reduces unnecessary memory use and potential DoS exposure.
+  const contentLengthHeader = response.headers.get("content-length");
+  if (contentLengthHeader) {
+    const contentLength = parseInt(contentLengthHeader, 10);
+    if (Number.isFinite(contentLength) && contentLength > config.media.maxAttachmentSizeBytes) {
+      throw new Error(
+        `Twilio media Content-Length ${contentLength} exceeds maximum ${config.media.maxAttachmentSizeBytes} bytes`,
+      );
+    }
+  }
+
   const rawMimeType = response.headers.get("content-type") ?? "application/octet-stream";
   const mimeType = rawMimeType.split(";")[0].trim();
   const buffer = Buffer.from(await response.arrayBuffer());

@@ -18,7 +18,7 @@ function optionalIntEnv(key: string, fallback: number): number {
 }
 
 // Derive the public base URL for media proxy tokens from TWILIO_WEBHOOK_URL when
-// PUBLIC_BASE_URL is not explicitly provided. Strip the known webhook path suffix.
+// PUBLIC_BASE_URL is not explicitly provided. Extracts the protocol and host only.
 function resolvePublicBaseUrl(webhookUrl: string): string {
   const explicit = process.env.PUBLIC_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, "");

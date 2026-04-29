@@ -90,7 +90,12 @@ async function downloadInboundAttachments(
 
     try {
       const { buffer, mimeType: detectedMimeType } = await downloadTwilioMedia(rawMediaUrl);
-      const finalMimeType = detectedMimeType || mimeType;
+      // Re-validate the content-type reported by the response against the allowlist.
+      // Twilio CDN may return a different type (e.g. application/octet-stream) from the
+      // webhook field. Fall back to the pre-validated Twilio-reported type when the
+      // detected type is absent or not on the allowlist.
+      const finalMimeType =
+        detectedMimeType && validateMimeType(detectedMimeType).valid ? detectedMimeType : mimeType;
       const sizeCheck = validateAttachmentSize(
         finalMimeType,
         buffer.length,
@@ -107,7 +112,17 @@ async function downloadInboundAttachments(
         continue;
       }
 
-      const fileName = sanitizeFileName(fileNameFromMimeType(finalMimeType));
+      // Generate a unique filename per attachment to avoid collisions when multiple
+      // items of the same MIME type arrive in one message.
+      const baseName = fileNameFromMimeType(finalMimeType);
+      const dotIdx = baseName.lastIndexOf(".");
+      const uniqueName =
+        index === 0
+          ? baseName
+          : dotIdx >= 0
+            ? `${baseName.slice(0, dotIdx)}_${index}${baseName.slice(dotIdx)}`
+            : `${baseName}_${index}`;
+      const fileName = sanitizeFileName(uniqueName);
       attachments.push({
         buffer,
         mimeType: finalMimeType,
@@ -274,7 +289,13 @@ async function redownloadPendingAttachments(
   for (const meta of pending) {
     try {
       const { buffer, mimeType: detectedMimeType } = await downloadTwilioMedia(meta.mediaUrl);
-      const finalMimeType = detectedMimeType || meta.contentType;
+      // Re-validate the detected content-type against the allowlist, just as the
+      // initial download path does. Fall back to the stored type when the detected
+      // type is absent or not on the allowlist.
+      const finalMimeType =
+        detectedMimeType && validateMimeType(detectedMimeType).valid
+          ? detectedMimeType
+          : meta.contentType;
       const sizeCheck = validateAttachmentSize(
         finalMimeType,
         buffer.length,

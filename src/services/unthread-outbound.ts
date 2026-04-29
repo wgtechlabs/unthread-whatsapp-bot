@@ -210,6 +210,18 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
   }
 }
 
+// Returns true when the given URL is on the configured Unthread API origin.
+// Only URLs on this origin should receive the X-API-KEY credential.
+function isUnthreadApiUrl(url: string): boolean {
+  try {
+    const target = new URL(url);
+    const apiOrigin = new URL(config.unthread.apiUrl);
+    return target.hostname === apiOrigin.hostname;
+  } catch {
+    return false;
+  }
+}
+
 // Build a publicly accessible proxy URL for a single outbound file record.
 // Returns null if no public base URL is configured or token storage fails.
 async function buildProxyUrl(file: OutboundFileRecord): Promise<string | null> {
@@ -224,13 +236,19 @@ async function buildProxyUrl(file: OutboundFileRecord): Promise<string | null> {
     return null;
   }
 
+  // Only store the raw download URL when it is on the Unthread API origin to
+  // prevent SSRF and avoid forwarding the API key to a third-party host.
+  const rawDownloadUrl = file.urlPrivateDownload ?? file.urlPrivate;
+  const safeDownloadUrl =
+    rawDownloadUrl && isUnthreadApiUrl(rawDownloadUrl) ? rawDownloadUrl : undefined;
+
   try {
     const token = await storeProxyToken({
       fileId: file.id,
       fileName: sanitizeFileName(file.name),
       mimeType: file.mimetype ?? "application/octet-stream",
       fileSize: file.size,
-      downloadUrl: file.urlPrivateDownload ?? file.urlPrivate,
+      downloadUrl: safeDownloadUrl,
     });
     return `${baseUrl}/media/${token}`;
   } catch (error) {
