@@ -1,6 +1,11 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
-import type { UnthreadConversation, UnthreadCustomer, UnthreadMessage } from "../types";
+import type {
+  InboundAttachment,
+  UnthreadConversation,
+  UnthreadCustomer,
+  UnthreadMessage,
+} from "../types";
 import { isReusableConversationStatus } from "../types";
 import { buildWhatsAppFallbackEmail } from "./whatsapp-identity";
 
@@ -158,6 +163,61 @@ export async function addMessage(
       name: onBehalfOf.name,
     },
   });
+}
+
+// Add a message with file attachments to an existing conversation.
+// Uses multipart FormData with json and attachments fields as expected by the Unthread API.
+export async function addMessageWithAttachments(
+  conversationId: string,
+  message: string,
+  onBehalfOf: { email: string; name: string },
+  attachments: InboundAttachment[],
+): Promise<UnthreadMessage> {
+  const url = `${config.unthread.apiUrl}/conversations/${conversationId}/messages`;
+
+  LogEngine.debug("Unthread API POST multipart", {
+    path: `/conversations/${conversationId}/messages`,
+    attachmentCount: attachments.length,
+  });
+
+  const form = new FormData();
+  form.append(
+    "json",
+    JSON.stringify({
+      body: { type: "markdown", value: message },
+      onBehalfOf: { email: onBehalfOf.email, name: onBehalfOf.name },
+    }),
+  );
+
+  for (const attachment of attachments) {
+    // Convert Buffer to a plain ArrayBuffer to satisfy the Blob constructor's type constraints.
+    const arrayBuffer = attachment.buffer.buffer.slice(
+      attachment.buffer.byteOffset,
+      attachment.buffer.byteOffset + attachment.buffer.byteLength,
+    ) as ArrayBuffer;
+    const blob = new Blob([arrayBuffer], { type: attachment.mimeType });
+    form.append("attachments", blob, attachment.fileName);
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "X-API-KEY": config.unthread.apiKey },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new UnthreadApiError(
+      "POST",
+      `/conversations/${conversationId}/messages`,
+      res.status,
+      text,
+    );
+  }
+
+  const data = (await res.json()) as UnthreadMessage;
+  LogEngine.debug("Unthread API POST multipart response OK");
+  return data;
 }
 
 // Get a conversation by ID

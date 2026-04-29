@@ -16,6 +16,56 @@ export async function sendWhatsAppMessage(to: string, body: string): Promise<str
   return message.sid;
 }
 
+// Send a WhatsApp media message via Twilio.
+// Twilio WhatsApp outbound media requires publicly reachable mediaUrl values.
+// Images support an optional caption via body; for other media types Twilio ignores body.
+export async function sendWhatsAppMediaMessage(
+  to: string,
+  mediaUrls: string[],
+  body?: string,
+): Promise<string> {
+  if (mediaUrls.length === 0) {
+    throw new Error("sendWhatsAppMediaMessage requires at least one mediaUrl");
+  }
+
+  const message = await client.messages.create({
+    from: config.twilio.whatsappNumber,
+    to,
+    mediaUrl: mediaUrls,
+    ...(body ? { body } : {}),
+  });
+
+  LogEngine.debug("WhatsApp media message sent via Twilio", {
+    sid: message.sid,
+    to,
+    mediaCount: mediaUrls.length,
+  });
+  return message.sid;
+}
+
+// Download a media file from a Twilio media URL using Basic auth credentials.
+// Returns a Buffer along with the response Content-Type.
+export async function downloadTwilioMedia(
+  mediaUrl: string,
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
+  const authHeader = `Basic ${Buffer.from(credentials).toString("base64")}`;
+
+  const response = await fetch(mediaUrl, {
+    headers: { Authorization: authHeader },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download Twilio media: HTTP ${response.status}`);
+  }
+
+  const rawMimeType = response.headers.get("content-type") ?? "application/octet-stream";
+  const mimeType = rawMimeType.split(";")[0].trim();
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  return { buffer, mimeType };
+}
+
 // Extract phone number from Twilio WhatsApp format
 // "whatsapp:+1234567890" -> "+1234567890"
 export function extractPhone(twilioFrom: string): string {
