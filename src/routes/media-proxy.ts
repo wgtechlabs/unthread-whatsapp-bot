@@ -1,3 +1,5 @@
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { LogEngine } from "@wgtechlabs/log-engine";
 import type { Request, Response } from "express";
 import { Router } from "express";
@@ -8,12 +10,12 @@ import { getProxyToken } from "../services/media-proxy-store";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Returns true when the given URL is on the configured Unthread API origin.
-// The X-API-KEY credential must only be forwarded to that origin.
+// The X-API-KEY credential must only be forwarded to that exact origin.
 function isUnthreadApiUrl(url: string): boolean {
   try {
     const target = new URL(url);
     const apiOrigin = new URL(config.unthread.apiUrl);
-    return target.hostname === apiOrigin.hostname;
+    return target.origin === apiOrigin.origin;
   } catch {
     return false;
   }
@@ -61,13 +63,22 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
     return;
   }
 
+  // Hard-reject any download URL that is not on the Unthread API origin.
+  // All legitimate tokens are constructed with Unthread-origin URLs, so a
+  // non-Unthread URL here indicates tampered or corrupted token data and
+  // must not be proxied (prevents SSRF).
+  if (!isUnthreadApiUrl(downloadUrl)) {
+    LogEngine.error("Media proxy: download URL is not on the Unthread API origin — refusing", {
+      fileName: meta.fileName,
+    });
+    res.status(403).end();
+    return;
+  }
+
   try {
-    // Only attach the Unthread API key when the download URL is on the Unthread
-    // API origin. Sending credentials to an arbitrary host would leak the key
-    // and enable SSRF via attacker-controlled token metadata.
-    const headers: Record<string, string> = isUnthreadApiUrl(downloadUrl)
-      ? { "X-API-KEY": config.unthread.apiKey }
-      : {};
+    // Since the hard-reject above ensures downloadUrl is on the Unthread API
+    // origin, always attach the X-API-KEY credential.
+    const headers: Record<string, string> = { "X-API-KEY": config.unthread.apiKey };
 
     const fileRes = await fetch(downloadUrl, { headers });
 
@@ -92,13 +103,10 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
     }
 
     if (fileRes.body) {
-      const reader = fileRes.body.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(value);
-      }
-      res.end();
+      // Convert the Web ReadableStream to a Node Readable and pipe to the
+      // response so that backpressure and client aborts are handled correctly.
+      const nodeStream = Readable.fromWeb(fileRes.body as Parameters<typeof Readable.fromWeb>[0]);
+      await pipeline(nodeStream, res);
     } else {
       const buffer = await fileRes.arrayBuffer();
       res.end(Buffer.from(buffer));

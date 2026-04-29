@@ -211,12 +211,12 @@ async function processConversationUpdate(event: UnthreadQueuedEvent): Promise<vo
 }
 
 // Returns true when the given URL is on the configured Unthread API origin.
-// Only URLs on this origin should receive the X-API-KEY credential.
+// Only URLs on this exact origin should receive the X-API-KEY credential.
 function isUnthreadApiUrl(url: string): boolean {
   try {
     const target = new URL(url);
     const apiOrigin = new URL(config.unthread.apiUrl);
-    return target.hostname === apiOrigin.hostname;
+    return target.origin === apiOrigin.origin;
   } catch {
     return false;
   }
@@ -241,6 +241,17 @@ async function buildProxyUrl(file: OutboundFileRecord): Promise<string | null> {
   const rawDownloadUrl = file.urlPrivateDownload ?? file.urlPrivate;
   const safeDownloadUrl =
     rawDownloadUrl && isUnthreadApiUrl(rawDownloadUrl) ? rawDownloadUrl : undefined;
+
+  // Reject early if there is no resolvable download target: neither a safe URL
+  // nor a file ID that can be used to construct one. Without at least one of
+  // these the proxy endpoint will always 404.
+  if (!safeDownloadUrl && !file.id) {
+    LogEngine.warn(
+      "buildProxyUrl: no safe download URL or file ID available — skipping proxy token",
+      { fileName: file.name },
+    );
+    return null;
+  }
 
   try {
     const token = await storeProxyToken({

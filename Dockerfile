@@ -5,7 +5,7 @@ ARG BUN_VERSION=1.3.9
 FROM oven/bun:${BUN_VERSION}-alpine AS base
 
 RUN apk update && apk upgrade && \
-    apk add --no-cache dumb-init && \
+    apk add --no-cache dumb-init wget && \
     rm -rf /var/cache/apk/*
 
 WORKDIR /usr/src/app

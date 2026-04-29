@@ -92,7 +92,41 @@ export async function downloadTwilioMedia(
 
   const rawMimeType = response.headers.get("content-type") ?? "application/octet-stream";
   const mimeType = rawMimeType.split(";")[0].trim();
-  const buffer = Buffer.from(await response.arrayBuffer());
+
+  if (!response.body) {
+    throw new Error("Failed to download Twilio media: empty response body");
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      const chunk = Buffer.from(value);
+      totalBytes += chunk.length;
+
+      if (totalBytes > config.media.maxAttachmentSizeBytes) {
+        await reader.cancel(
+          `Twilio media size exceeds maximum ${config.media.maxAttachmentSizeBytes} bytes`,
+        );
+        throw new Error(
+          `Twilio media download exceeded maximum ${config.media.maxAttachmentSizeBytes} bytes`,
+        );
+      }
+
+      chunks.push(chunk);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const buffer = Buffer.concat(chunks, totalBytes);
 
   return { buffer, mimeType };
 }
