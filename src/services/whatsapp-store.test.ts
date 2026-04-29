@@ -18,6 +18,15 @@ class MockStorageClient {
     return true;
   }
 
+  async setIfNotExists(key: string, value: unknown, options?: { ttl?: number }): Promise<boolean> {
+    const existing = await this.get(key);
+    if (existing !== null) {
+      return false;
+    }
+
+    return this.set(key, value, options);
+  }
+
   async get<T>(key: string): Promise<T | null> {
     const entry = this.records.get(key);
     if (!entry) return null;
