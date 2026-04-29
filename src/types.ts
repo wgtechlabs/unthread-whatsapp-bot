@@ -130,6 +130,7 @@ export interface UnthreadQueuedEvent {
 export interface MediaProxyTokenRecord {
   token: string;
   fileId?: string; // Slack-style file ID if present (e.g. "F12345")
+  conversationId?: string; // Unthread conversation ID required for fileId fallback downloads
   fileName: string;
   mimeType: string;
   fileSize?: number;
