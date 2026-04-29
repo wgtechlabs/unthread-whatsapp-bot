@@ -81,10 +81,10 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
     }
 
     const safeFileName = sanitizeFileName(meta.fileName);
-    // Escape double-quote characters in the filename to prevent Content-Disposition injection.
-    const escapedFileName = safeFileName.replace(/"/g, '\\"');
+    // sanitizeFileName already replaces " and \ with _ and strips control characters,
+    // so safeFileName is safe to embed directly in the Content-Disposition header.
     res.setHeader("Content-Type", meta.mimeType);
-    res.setHeader("Content-Disposition", `inline; filename="${escapedFileName}"`);
+    res.setHeader("Content-Disposition", `inline; filename="${safeFileName}"`);
 
     const contentLength = fileRes.headers.get("content-length");
     if (contentLength) {

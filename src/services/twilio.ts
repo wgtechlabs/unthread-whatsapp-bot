@@ -69,7 +69,7 @@ export async function downloadTwilioMedia(
   const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
   const authHeader = `Basic ${Buffer.from(credentials).toString("base64")}`;
 
-  const response = await fetch(mediaUrl, {
+  const response = await fetch(parsedUrl.href, {
     headers: { Authorization: authHeader },
   });
 
