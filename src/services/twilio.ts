@@ -69,9 +69,13 @@ export async function downloadTwilioMedia(
   const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
   const authHeader = `Basic ${Buffer.from(credentials).toString("base64")}`;
 
+  // Twilio media URLs redirect to CDN (e.g. media.twiliocdn.com). The fetch
+  // spec strips the Authorization header for cross-origin redirects, so the
+  // Twilio Basic-auth credential is only sent to api.twilio.com — the CDN
+  // receives the request without it (CDN uses pre-signed URLs in the path).
   const response = await fetch(parsedUrl.href, {
     headers: { Authorization: authHeader },
-    redirect: "error",
+    redirect: "follow",
   });
 
   if (!response.ok) {
