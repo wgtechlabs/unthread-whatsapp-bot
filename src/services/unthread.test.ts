@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 
 function setRequiredEnv(): void {
-  process.env.TWILIO_ACCOUNT_SID = "test-account";
+  process.env.TWILIO_ACCOUNT_SID = "AC00000000000000000000000000000000";
   process.env.TWILIO_AUTH_TOKEN = "test-token";
   process.env.TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155550123";
   process.env.TWILIO_WEBHOOK_URL = "https://example.com/webhooks/twilio";

@@ -111,7 +111,8 @@ function buildOutboundDeliveryKey(
   const data = eventDataRecord(event);
   const dataId = readString(data, "id");
   const eventId =
-    readString(data, "messageId") || readString(data, "eventId") ||
+    readString(data, "messageId") ||
+    readString(data, "eventId") ||
     (dataId && dataId !== conversationId ? dataId : "");
 
   if (eventId) {
@@ -277,7 +278,10 @@ function isUnthreadApiUrl(url: string): boolean {
 
 // Build a publicly accessible proxy URL for a single outbound file record.
 // Returns null if no public base URL is configured or token storage fails.
-async function buildProxyUrl(file: OutboundFileRecord): Promise<string | null> {
+async function buildProxyUrl(
+  conversationId: string,
+  file: OutboundFileRecord,
+): Promise<string | null> {
   const baseUrl = config.media.publicBaseUrl;
   if (!baseUrl) {
     LogEngine.warn(
@@ -298,9 +302,9 @@ async function buildProxyUrl(file: OutboundFileRecord): Promise<string | null> {
   // Reject early if there is no resolvable download target: neither a safe URL
   // nor a file ID that can be used to construct one. Without at least one of
   // these the proxy endpoint will always 404.
-  if (!safeDownloadUrl && !file.id) {
+  if (!safeDownloadUrl && (!file.id || !conversationId)) {
     LogEngine.warn(
-      "buildProxyUrl: no safe download URL or file ID available — skipping proxy token",
+      "buildProxyUrl: no safe download URL or file fallback metadata available — skipping proxy token",
       { fileName: file.name },
     );
     return null;
@@ -309,6 +313,7 @@ async function buildProxyUrl(file: OutboundFileRecord): Promise<string | null> {
   try {
     const token = await storeProxyToken({
       fileId: file.id,
+      conversationId,
       fileName: sanitizeFileName(file.name),
       mimeType: file.mimetype ?? "application/octet-stream",
       fileSize: file.size,
@@ -364,10 +369,7 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
 
   const twilioTo = toWhatsAppFormat(phone);
   const deliveryKey = buildOutboundDeliveryKey(event, conversationId, message, files);
-  const shouldSend = await claimOutboundDelivery(
-    deliveryKey,
-    OUTBOUND_DELIVERY_DEDUPE_TTL_SECONDS,
-  );
+  const shouldSend = await claimOutboundDelivery(deliveryKey, OUTBOUND_DELIVERY_DEDUPE_TTL_SECONDS);
 
   if (!shouldSend) {
     LogEngine.info("Skipping duplicate outbound WhatsApp delivery", {
@@ -377,20 +379,11 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
     return;
   }
 
-  // Handle text portion
-  if (message) {
-    try {
-      await sendWhatsAppMessage(twilioTo, message);
-      LogEngine.info("Agent reply sent to WhatsApp", { phone, conversationId });
-    } catch (err: unknown) {
-      handleTwilioSendError(err, phone, conversationId);
-    }
-  }
-
   // Handle file attachments
+  let textSent = false;
   if (files.length > 0) {
     for (const file of files) {
-      const proxyUrl = await buildProxyUrl(file);
+      const proxyUrl = await buildProxyUrl(conversationId, file);
       if (!proxyUrl) {
         LogEngine.warn("Skipping outbound file: could not build proxy URL", {
           fileName: file.name,
@@ -400,7 +393,11 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
       }
 
       try {
-        await sendWhatsAppMediaMessage(twilioTo, [proxyUrl]);
+        const caption = !textSent && message ? message : undefined;
+        await sendWhatsAppMediaMessage(twilioTo, [proxyUrl], caption);
+        if (caption) {
+          textSent = true;
+        }
         LogEngine.info("Outbound file sent to WhatsApp via media proxy", {
           phone,
           conversationId,
@@ -409,6 +406,17 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
       } catch (err: unknown) {
         handleTwilioSendError(err, phone, conversationId);
       }
+    }
+  }
+
+  // Handle text portion. When files are present, prefer using the text as the
+  // first media caption; fall back to a text-only message if no media send used it.
+  if (message && !textSent) {
+    try {
+      await sendWhatsAppMessage(twilioTo, message);
+      LogEngine.info("Agent reply sent to WhatsApp", { phone, conversationId });
+    } catch (err: unknown) {
+      handleTwilioSendError(err, phone, conversationId);
     }
   }
 }
