@@ -149,7 +149,7 @@ describe("unthread service error handling", () => {
       "conv_abc",
       "Here is the file",
       { email: "user@example.com", name: "Test User" },
-      [attachment],
+      [{ ...attachment, originalMediaUrl: "https://api.twilio.com/media/0" }],
     );
 
     expect(capturedRequest).not.toBeNull();
@@ -189,6 +189,7 @@ describe("unthread service error handling", () => {
           mimeType: "application/pdf",
           fileName: "doc.pdf",
           sizeBytes: 4,
+          originalMediaUrl: "https://api.twilio.com/media/1",
         },
       ],
     );
@@ -209,7 +210,15 @@ describe("unthread service error handling", () => {
         "conv_fail",
         "test",
         { email: "u@example.com", name: "U" },
-        [{ buffer: Buffer.from("x"), mimeType: "image/jpeg", fileName: "x.jpg", sizeBytes: 1 }],
+        [
+          {
+            buffer: Buffer.from("x"),
+            mimeType: "image/jpeg",
+            fileName: "x.jpg",
+            sizeBytes: 1,
+            originalMediaUrl: "https://api.twilio.com/media/2",
+          },
+        ],
       ),
     ).rejects.toMatchObject({ name: "UnthreadApiError", status: 500 });
   });

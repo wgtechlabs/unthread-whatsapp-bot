@@ -45,9 +45,27 @@ export async function sendWhatsAppMediaMessage(
 
 // Download a media file from a Twilio media URL using Basic auth credentials.
 // Returns a Buffer along with the response Content-Type.
+// Validates that the URL belongs to Twilio's API domain before sending credentials.
 export async function downloadTwilioMedia(
   mediaUrl: string,
 ): Promise<{ buffer: Buffer; mimeType: string }> {
+  // Validate that the URL is a trusted Twilio API origin before attaching credentials.
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(mediaUrl);
+  } catch {
+    throw new Error("Invalid Twilio media URL");
+  }
+
+  const allowedHosts = ["api.twilio.com", "media.twiliocdn.com"];
+  if (
+    !allowedHosts.some(
+      (host) => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`),
+    )
+  ) {
+    throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
+  }
+
   const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
   const authHeader = `Basic ${Buffer.from(credentials).toString("base64")}`;
 

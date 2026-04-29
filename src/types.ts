@@ -48,6 +48,7 @@ export interface InboundAttachment {
   mimeType: string;
   fileName: string;
   sizeBytes: number;
+  originalMediaUrl: string; // Original Twilio media URL for deferred re-download
 }
 
 // Metadata stored in pending email collection state for deferred attachment upload

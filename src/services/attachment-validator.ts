@@ -30,7 +30,7 @@ export interface AttachmentValidationResult {
   reason?: string;
 }
 
-// Normalise a raw MIME type string by stripping parameters (e.g. "image/jpeg; charset=…")
+// Normalize a raw MIME type string by stripping parameters (e.g. "image/jpeg; charset=…")
 export function normalizeMimeType(raw: string): string {
   return raw.split(";")[0].trim().toLowerCase();
 }

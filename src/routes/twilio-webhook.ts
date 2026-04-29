@@ -113,6 +113,7 @@ async function downloadInboundAttachments(
         mimeType: finalMimeType,
         fileName,
         sizeBytes: buffer.length,
+        originalMediaUrl: rawMediaUrl,
       });
     } catch (error) {
       LogEngine.error("Failed to download inbound Twilio media", {
@@ -293,6 +294,7 @@ async function redownloadPendingAttachments(
         mimeType: finalMimeType,
         fileName: sanitizeFileName(meta.fileName),
         sizeBytes: buffer.length,
+        originalMediaUrl: meta.mediaUrl,
       });
     } catch (error) {
       LogEngine.error("Failed to re-download pending attachment after email capture", {
@@ -454,17 +456,15 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
     if (!existingCustomer) {
       LogEngine.info("Starting email collection for new WhatsApp user", { phone });
 
-      // Build pending attachment metadata (URLs only, no bytes) for deferred upload
+      // Build pending attachment metadata (URLs only, no bytes) for deferred upload.
+      // Use the originalMediaUrl stored with each attachment to avoid index alignment issues
+      // when some media items were skipped during validation.
       const pendingAttachmentMeta: PendingAttachmentMeta[] = inboundAttachments.map(
-        (attachment, index) => {
-          const mediaUrlKey = `MediaUrl${index}` as keyof TwilioIncomingMessage;
-          const rawUrl = (message[mediaUrlKey] as string | undefined) ?? "";
-          return {
-            mediaUrl: rawUrl,
-            contentType: attachment.mimeType,
-            fileName: attachment.fileName,
-          };
-        },
+        (attachment) => ({
+          mediaUrl: attachment.originalMediaUrl,
+          contentType: attachment.mimeType,
+          fileName: attachment.fileName,
+        }),
       );
 
       try {

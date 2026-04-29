@@ -64,8 +64,10 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
     }
 
     const safeFileName = sanitizeFileName(meta.fileName);
+    // Escape double-quote characters in the filename to prevent Content-Disposition injection.
+    const escapedFileName = safeFileName.replace(/"/g, '\\"');
     res.setHeader("Content-Type", meta.mimeType);
-    res.setHeader("Content-Disposition", `inline; filename="${safeFileName}"`);
+    res.setHeader("Content-Disposition", `inline; filename="${escapedFileName}"`);
 
     const contentLength = fileRes.headers.get("content-length");
     if (contentLength) {

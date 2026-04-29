@@ -270,7 +270,7 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
   }
 
   if (!message && files.length === 0) {
-    LogEngine.debug("Skipping Unthread event: missing conversationId or message body");
+    LogEngine.debug("Skipping Unthread event: missing message body and files");
     return;
   }
 
