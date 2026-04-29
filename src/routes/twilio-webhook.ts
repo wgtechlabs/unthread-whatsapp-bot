@@ -42,13 +42,43 @@ const ATTACHMENT_FALLBACK_BODY = "📎 File attachment";
 // visually distinct without repeating the full user text.
 const ATTACHMENT_MARKER_BODY = "📎 Attachment";
 
+// Parse the NumMedia field from a Twilio message into a non-negative integer.
+// Returns 0 for missing, non-finite, or negative values.
+export function parseNumMedia(message: TwilioIncomingMessage): number {
+  const parsed = parseInt(message.NumMedia ?? "0", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+// Extract raw media URL/contentType pairs from a Twilio message without downloading.
+// Iterates up to 10 items and skips entries where the URL is absent.
+export function extractMediaItems(
+  message: TwilioIncomingMessage,
+): Array<{ url: string; contentType: string }> {
+  const numMedia = parseNumMedia(message);
+  const items: Array<{ url: string; contentType: string }> = [];
+
+  for (let index = 0; index < Math.min(numMedia, 10); index++) {
+    const urlKey = `MediaUrl${index}` as keyof TwilioIncomingMessage;
+    const typeKey = `MediaContentType${index}` as keyof TwilioIncomingMessage;
+
+    const url = message[urlKey] as string | undefined;
+    const contentType = (message[typeKey] as string | undefined) ?? "application/octet-stream";
+
+    if (url) {
+      items.push({ url, contentType });
+    }
+  }
+
+  return items;
+}
+
 // Parse inbound Twilio media fields and return an array of attachment objects.
 // Returns an empty array when NumMedia is 0 or media fields are absent.
 async function downloadInboundAttachments(
   message: TwilioIncomingMessage,
 ): Promise<InboundAttachment[]> {
-  const numMedia = parseInt(message.NumMedia ?? "0", 10);
-  if (!Number.isFinite(numMedia) || numMedia <= 0) {
+  const numMedia = parseNumMedia(message);
+  if (numMedia <= 0) {
     return [];
   }
 
@@ -266,6 +296,7 @@ async function recoverPromptFailureWithFallback(
   profileName: string | null,
   initialMessage: string,
   stage: "initial" | "retry",
+  attachments: InboundAttachment[] = [],
   error?: unknown,
 ): Promise<void> {
   await recoverFromEmailPromptFailure({
@@ -275,7 +306,7 @@ async function recoverPromptFailureWithFallback(
     stage,
     error,
     clearPendingState: async () => clearEmailCollectionState(phone),
-    forwardFallback: async () => forwardWithFallbackEmail(phone, profileName, initialMessage),
+    forwardFallback: async () => forwardWithFallbackEmail(phone, profileName, initialMessage, attachments),
   });
 }
 
@@ -420,6 +451,10 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
 
       const email = normalizeEmail(body);
       if (!email) {
+        const retryAttachments = [
+          ...(await redownloadPendingAttachments(pendingEmailCollection.pendingAttachments ?? [])),
+          ...inboundAttachments,
+        ];
         try {
           const promptSent = await sendEmailPromptMessage(phone, { retry: true });
           if (!promptSent) {
@@ -428,6 +463,7 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
               profileName ?? pendingEmailCollection.profileName,
               pendingEmailCollection.initialMessage,
               "retry",
+              retryAttachments,
             );
           }
         } catch (error) {
@@ -436,6 +472,7 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
             profileName ?? pendingEmailCollection.profileName,
             pendingEmailCollection.initialMessage,
             "retry",
+            retryAttachments,
             error,
           );
         }
@@ -509,10 +546,10 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
       try {
         const promptSent = await sendEmailPromptMessage(phone);
         if (!promptSent) {
-          await recoverPromptFailureWithFallback(phone, profileName, body, "initial");
+          await recoverPromptFailureWithFallback(phone, profileName, body, "initial", inboundAttachments);
         }
       } catch (error) {
-        await recoverPromptFailureWithFallback(phone, profileName, body, "initial", error);
+        await recoverPromptFailureWithFallback(phone, profileName, body, "initial", inboundAttachments, error);
       }
       return;
     }

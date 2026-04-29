@@ -1,32 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TwilioIncomingMessage } from "../types";
-
-// Test helpers that mirror the parsing logic in twilio-webhook.ts
-function parseNumMedia(message: TwilioIncomingMessage): number {
-  const parsed = parseInt(message.NumMedia ?? "0", 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-}
-
-function extractMediaItems(
-  message: TwilioIncomingMessage,
-): Array<{ url: string; contentType: string }> {
-  const numMedia = parseNumMedia(message);
-  const items: Array<{ url: string; contentType: string }> = [];
-
-  for (let index = 0; index < Math.min(numMedia, 10); index++) {
-    const urlKey = `MediaUrl${index}` as keyof TwilioIncomingMessage;
-    const typeKey = `MediaContentType${index}` as keyof TwilioIncomingMessage;
-
-    const url = message[urlKey] as string | undefined;
-    const contentType = (message[typeKey] as string | undefined) ?? "application/octet-stream";
-
-    if (url) {
-      items.push({ url, contentType });
-    }
-  }
-
-  return items;
-}
+import { extractMediaItems, parseNumMedia } from "./twilio-webhook";
 
 describe("Twilio inbound media parsing", () => {
   test("NumMedia=0 text-only message produces no media items", () => {
