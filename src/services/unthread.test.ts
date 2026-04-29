@@ -122,6 +122,20 @@ describe("unthread service error handling", () => {
     });
   });
 
+  test("findOpenConversationByCustomer treats 404 as no reusable conversation", async () => {
+    globalThis.fetch = withFetchShape(
+      async () =>
+        new Response(JSON.stringify({ errors: [{ status: 404, title: "Not found." }] }), {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }),
+    );
+
+    await expect(unthread.findOpenConversationByCustomer("cust_404")).resolves.toBeNull();
+  });
+
   test("addMessageWithAttachments sends multipart FormData with json and attachments fields", async () => {
     let capturedRequest: Request | null = null;
 

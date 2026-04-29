@@ -234,10 +234,22 @@ export async function getCustomer(customerId: string): Promise<UnthreadCustomer>
 export async function findOpenConversationByCustomer(
   customerId: string,
 ): Promise<UnthreadConversation | null> {
-  const conversations = await request<UnthreadConversation[]>(
-    "GET",
-    `/conversations?customerId=${encodeURIComponent(customerId)}`,
-  );
+  let conversations: UnthreadConversation[];
+  const path = `/conversations?customerId=${encodeURIComponent(customerId)}`;
+
+  try {
+    conversations = await request<UnthreadConversation[]>("GET", path);
+  } catch (error) {
+    if (isUnthreadApiNotFoundError(error)) {
+      LogEngine.debug("No conversations found for customer", {
+        customerId,
+        path,
+      });
+      return null;
+    }
+
+    throw error;
+  }
 
   // Reuse any active customer-facing conversation status.
   const open = conversations.find((c) => isReusableConversationStatus(c.status));
