@@ -306,7 +306,8 @@ async function recoverPromptFailureWithFallback(
     stage,
     error,
     clearPendingState: async () => clearEmailCollectionState(phone),
-    forwardFallback: async () => forwardWithFallbackEmail(phone, profileName, initialMessage, attachments),
+    forwardFallback: async () =>
+      forwardWithFallbackEmail(phone, profileName, initialMessage, attachments),
   });
 }
 
@@ -546,10 +547,23 @@ twilioWebhookRouter.post("/", async (req: Request, res: Response) => {
       try {
         const promptSent = await sendEmailPromptMessage(phone);
         if (!promptSent) {
-          await recoverPromptFailureWithFallback(phone, profileName, body, "initial", inboundAttachments);
+          await recoverPromptFailureWithFallback(
+            phone,
+            profileName,
+            body,
+            "initial",
+            inboundAttachments,
+          );
         }
       } catch (error) {
-        await recoverPromptFailureWithFallback(phone, profileName, body, "initial", inboundAttachments, error);
+        await recoverPromptFailureWithFallback(
+          phone,
+          profileName,
+          body,
+          "initial",
+          inboundAttachments,
+          error,
+        );
       }
       return;
     }
