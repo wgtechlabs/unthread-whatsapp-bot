@@ -71,6 +71,7 @@ export async function downloadTwilioMedia(
 
   const response = await fetch(parsedUrl.href, {
     headers: { Authorization: authHeader },
+    redirect: "error",
   });
 
   if (!response.ok) {

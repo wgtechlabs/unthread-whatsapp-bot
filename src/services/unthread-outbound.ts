@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
 import type { OutboundFileRecord, UnthreadQueuedEvent } from "../types";
@@ -7,11 +8,12 @@ import { storeProxyToken } from "./media-proxy-store";
 import { resolveTicketNumber, sendStatusChangeMessage } from "./system-messages";
 import { sendWhatsAppMediaMessage, sendWhatsAppMessage, toWhatsAppFormat } from "./twilio";
 import * as unthread from "./unthread";
-import { updateTicketStatus } from "./whatsapp-store";
+import { claimOutboundDelivery, updateTicketStatus } from "./whatsapp-store";
 
 // Twilio WhatsApp error codes
 const TWILIO_ERR_SANDBOX_EXPIRED = 63015;
 const TWILIO_ERR_OUTSIDE_24H_WINDOW = 63016;
+const OUTBOUND_DELIVERY_DEDUPE_TTL_SECONDS = 120;
 
 function normalize(str: unknown): string {
   return typeof str === "string" ? str.trim().toLowerCase() : "";
@@ -78,6 +80,57 @@ function extractFriendlyId(event: UnthreadQueuedEvent): unknown {
   const data = eventDataRecord(event);
 
   return conversation.friendlyId ?? data.friendlyId;
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function hashValue(value: unknown): string {
+  return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+function buildOutboundDeliveryKey(
+  event: UnthreadQueuedEvent,
+  conversationId: string,
+  message: string,
+  files: OutboundFileRecord[],
+): string {
+  const data = eventDataRecord(event);
+  const dataId = readString(data, "id");
+  const eventId =
+    readString(data, "messageId") || readString(data, "eventId") ||
+    (dataId && dataId !== conversationId ? dataId : "");
+
+  if (eventId) {
+    return `event:${hashValue({ eventId, type: normalize(event.type) })}`;
+  }
+
+  return `fingerprint:${hashValue({
+    conversationId,
+    files: files.map((file) => ({
+      id: file.id,
+      mimetype: file.mimetype,
+      name: file.name,
+      size: file.size,
+    })),
+    message,
+    sourcePlatform: normalize(event.sourcePlatform),
+    targetPlatform: normalize(event.targetPlatform),
+    type: normalize(event.type),
+  })}`;
 }
 
 function isMessageEvent(event: UnthreadQueuedEvent): boolean {
@@ -310,6 +363,19 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
   }
 
   const twilioTo = toWhatsAppFormat(phone);
+  const deliveryKey = buildOutboundDeliveryKey(event, conversationId, message, files);
+  const shouldSend = await claimOutboundDelivery(
+    deliveryKey,
+    OUTBOUND_DELIVERY_DEDUPE_TTL_SECONDS,
+  );
+
+  if (!shouldSend) {
+    LogEngine.info("Skipping duplicate outbound WhatsApp delivery", {
+      conversationId,
+      deliveryKey,
+    });
+    return;
+  }
 
   // Handle text portion
   if (message) {
