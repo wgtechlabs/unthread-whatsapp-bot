@@ -57,6 +57,12 @@ describe("downloadTwilioMedia", () => {
     await expect(downloadTwilioMedia(UNTRUSTED_URL)).rejects.toThrow("Untrusted Twilio media host");
   });
 
+  test("rejects non-HTTPS URLs before attaching credentials", async () => {
+    await expect(downloadTwilioMedia("http://api.twilio.com/media/ME001")).rejects.toThrow(
+      "Insecure Twilio media URL scheme",
+    );
+  });
+
   test("rejects malformed URLs", async () => {
     await expect(downloadTwilioMedia("not-a-url")).rejects.toThrow("Invalid Twilio media URL");
   });
@@ -115,11 +121,13 @@ describe("downloadTwilioMedia", () => {
   });
 
   test("throws when Content-Length header exceeds configured size limit", async () => {
-    const maxBytes = Number(process.env.MAX_ATTACHMENT_SIZE_BYTES ?? 16 * 1024 * 1024);
-    const oversizedBytes = maxBytes + 1;
+    // Import config to read the actual runtime limit — the module may be cached
+    // from another test file, so reading from config guarantees consistency.
+    const { config } = await import("../config");
+    const oversizedBytes = config.media.maxAttachmentSizeBytes + 1;
 
     globalThis.fetch = (async (): Promise<Response> => {
-      return new Response(null, {
+      return new Response(Buffer.from("x"), {
         status: 200,
         headers: {
           "content-type": "image/jpeg",
@@ -132,14 +140,26 @@ describe("downloadTwilioMedia", () => {
   });
 
   test("throws mid-stream when body exceeds configured size limit", async () => {
-    // Simulate a response whose body exceeds the limit but has no Content-Length header.
-    // Re-read MAX_ATTACHMENT_SIZE_BYTES the same way the Content-Length test does to
-    // keep both tests consistent with the configured limit.
-    const maxBytes = Number(process.env.MAX_ATTACHMENT_SIZE_BYTES ?? 16 * 1024 * 1024);
-    const oversizedBody = Buffer.alloc(maxBytes + 1);
+    // Import config to read the actual runtime limit. Use a ReadableStream that
+    // produces data in small chunks until the total exceeds the limit — this avoids
+    // allocating a contiguous buffer of (limit + 1) bytes (which could be 16 MB+).
+    const { config } = await import("../config");
+    const limit = config.media.maxAttachmentSizeBytes;
+    const chunkSize = Math.min(limit, 65536);
+
+    const oversizedStream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        let sent = 0;
+        while (sent <= limit) {
+          controller.enqueue(new Uint8Array(chunkSize));
+          sent += chunkSize;
+        }
+        controller.close();
+      },
+    });
 
     globalThis.fetch = (async (): Promise<Response> => {
-      return new Response(oversizedBody, {
+      return new Response(oversizedStream, {
         status: 200,
         headers: { "content-type": "image/jpeg" },
       });
@@ -148,11 +168,13 @@ describe("downloadTwilioMedia", () => {
     await expect(downloadTwilioMedia(VALID_TWILIO_URL)).rejects.toThrow("exceeded maximum");
   });
 
-  test("allows media.twiliocdn.com as a trusted host", async () => {
+  test("allows media.twiliocdn.com as a trusted host and does not send Authorization", async () => {
     const cdnUrl = "https://media.twiliocdn.com/AC001/ME001?v=1";
+    let capturedAuth: string | undefined;
     const fakeBody = Buffer.from("cdn-content");
 
-    globalThis.fetch = (async (): Promise<Response> => {
+    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      capturedAuth = (init?.headers as Record<string, string> | undefined)?.Authorization;
       return new Response(fakeBody, {
         status: 200,
         headers: { "content-type": "image/png" },
@@ -161,6 +183,8 @@ describe("downloadTwilioMedia", () => {
 
     const result = await downloadTwilioMedia(cdnUrl);
     expect(result.mimeType).toBe("image/png");
+    // Credentials must not be forwarded to CDN hosts.
+    expect(capturedAuth).toBeUndefined();
   });
 
   test("sends Basic auth header for Twilio credentials", async () => {
