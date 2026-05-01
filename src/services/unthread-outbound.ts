@@ -39,6 +39,11 @@ function readNumber(record: Record<string, unknown>, key: string): number | unde
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function readArrayString(values: string[] | undefined, index: number): string {
+  const value = values?.[index];
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function mimeCandidate(value: string): string {
   return /^[^/\s]+\/[^/\s]+$/.test(value) ? value : "";
 }
@@ -73,7 +78,7 @@ function normalizeOutboundFile(
   const name =
     readString(record, "name") ||
     readString(record, "title") ||
-    attachments?.names?.[index]?.trim() ||
+    readArrayString(attachments?.names, index) ||
     "attachment";
 
   const id =
@@ -83,7 +88,7 @@ function normalizeOutboundFile(
     readString(record, "mimetype") ||
     readString(record, "mimeType") ||
     mimeCandidate(type) ||
-    attachments?.types?.[index]?.trim();
+    readArrayString(attachments?.types, index);
   const urlPrivate = readString(record, "urlPrivate") || readString(record, "url_private");
   const urlPrivateDownload =
     readString(record, "urlPrivateDownload") || readString(record, "url_private_download");

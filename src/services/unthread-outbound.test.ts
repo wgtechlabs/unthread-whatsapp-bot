@@ -235,4 +235,75 @@ describe("outbound file extraction", () => {
 
     expect(extractFiles(event)).toEqual([]);
   });
+
+  test("keeps finite numeric sizes and ignores non-finite sizes", () => {
+    const event: UnthreadQueuedEvent = {
+      type: "message_created",
+      sourcePlatform: "dashboard",
+      targetPlatform: "whatsapp",
+      data: {
+        conversationId: "conv_sizes",
+        body: "Sizes",
+        files: [
+          { id: "F_VALID", name: "valid.png", size: 1234 },
+          { id: "F_NAN", name: "nan.png", size: Number.NaN },
+          { id: "F_INFINITY", name: "infinity.png", size: Number.POSITIVE_INFINITY },
+          { id: "F_STRING", name: "string.png", size: "1234" as unknown as number },
+        ],
+      },
+    };
+
+    expect(extractFiles(event).map((file) => file.size)).toEqual([
+      1234,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  test("accepts only valid MIME-shaped type fields", () => {
+    const event: UnthreadQueuedEvent = {
+      type: "message_created",
+      sourcePlatform: "dashboard",
+      targetPlatform: "whatsapp",
+      data: {
+        conversationId: "conv_mimes",
+        body: "Mimes",
+        files: [
+          { id: "F_IMAGE", name: "image.png", type: "image/png" },
+          { id: "F_INVALID", name: "invalid.png", type: "invalid" },
+          { id: "F_EMPTY_SUBTYPE", name: "empty.png", type: "image/" },
+          { id: "F_EXTRA", name: "extra.png", type: "image/png/extra" },
+        ],
+      },
+    };
+
+    expect(extractFiles(event).map((file) => file.mimetype)).toEqual([
+      "image/png",
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  test("trims attachment metadata fallback names and MIME types", () => {
+    const event: UnthreadQueuedEvent = {
+      type: "message_created",
+      sourcePlatform: "dashboard",
+      targetPlatform: "whatsapp",
+      data: {
+        conversationId: "conv_metadata",
+        body: "Metadata",
+        files: [{ id: "F_METADATA" }],
+      },
+      attachments: {
+        hasFiles: true,
+        fileCount: 1,
+        names: ["  metadata.png  "],
+        types: ["  image/png  "],
+      },
+    };
+
+    expect(extractFiles(event)).toMatchObject([{ name: "metadata.png", mimetype: "image/png" }]);
+  });
 });
