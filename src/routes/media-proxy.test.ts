@@ -11,6 +11,10 @@ function setRequiredEnv(): void {
   process.env.POSTGRES_URL = "postgresql://user:pass@localhost:5432/unthread_whatsapp";
 }
 
+// Set env vars at module load time so all lazy imports (inside beforeAll) find
+// the required variables ready, regardless of describe-block execution order.
+setRequiredEnv();
+
 describe("media proxy download URL resolution", () => {
   const originalEnv: Record<string, string | undefined> = {};
   let resolveMediaProxyDownloadUrl: typeof import("./media-proxy").resolveMediaProxyDownloadUrl;
@@ -28,7 +32,6 @@ describe("media proxy download URL resolution", () => {
     for (const key of keys) {
       originalEnv[key] = process.env[key];
     }
-    setRequiredEnv();
     ({ resolveMediaProxyDownloadUrl } = await import("./media-proxy"));
   });
 
@@ -64,7 +67,39 @@ describe("media proxy download URL resolution", () => {
     );
   });
 
-  test("falls back to Unthread file download endpoint when no direct URL is stored", () => {
+  test("image with Slack team ID uses /slack/files/{fileId}/thumb endpoint", () => {
+    const meta = tokenMeta({
+      fileId: "F12345ABCDE",
+      slackTeamId: "T0123ABCDE",
+      mimeType: "image/png",
+    });
+
+    expect(resolveMediaProxyDownloadUrl(meta)).toBe(
+      "https://api.unthread.io/api/slack/files/F12345ABCDE/thumb?thumbSize=1024&teamId=T0123ABCDE",
+    );
+  });
+
+  test("image without Slack team ID falls back to /files/{fileId}/download", () => {
+    const meta = tokenMeta({ fileId: "F12345ABCDE", mimeType: "image/jpeg" });
+
+    expect(resolveMediaProxyDownloadUrl(meta)).toBe(
+      "https://api.unthread.io/api/files/F12345ABCDE/download",
+    );
+  });
+
+  test("non-image with Slack team ID uses /files/{fileId}/download (not thumb)", () => {
+    const meta = tokenMeta({
+      fileId: "F12345ABCDE",
+      slackTeamId: "T0123ABCDE",
+      mimeType: "application/pdf",
+    });
+
+    expect(resolveMediaProxyDownloadUrl(meta)).toBe(
+      "https://api.unthread.io/api/files/F12345ABCDE/download",
+    );
+  });
+
+  test("falls back to /files/{fileId}/download when no direct URL or team ID stored", () => {
     const meta = tokenMeta({ fileId: "file_123", conversationId: "conv_123" });
 
     expect(resolveMediaProxyDownloadUrl(meta)).toBe(
@@ -83,5 +118,37 @@ describe("media proxy download URL resolution", () => {
   test("returns null when neither a direct URL nor a fileId is available", () => {
     expect(resolveMediaProxyDownloadUrl(tokenMeta({ conversationId: "conv_123" }))).toBeNull();
     expect(resolveMediaProxyDownloadUrl(tokenMeta({}))).toBeNull();
+  });
+});
+
+describe("Slack team ID extraction", () => {
+  let extractSlackTeamId: typeof import("../services/unthread-outbound").extractSlackTeamId;
+
+  beforeAll(async () => {
+    ({ extractSlackTeamId } = await import("../services/unthread-outbound"));
+  });
+
+  test("extracts team ID from files-pri URL", () => {
+    expect(
+      extractSlackTeamId("https://files.slack.com/files-pri/T0123ABCDE/F12345ABCDE/screenshot.png"),
+    ).toBe("T0123ABCDE");
+  });
+
+  test("extracts team ID from files-tmb URL", () => {
+    expect(
+      extractSlackTeamId(
+        "https://files.slack.com/files-tmb/T9ZZZZABCDE/F12345ABCDE/screenshot_720.jpg",
+      ),
+    ).toBe("T9ZZZZABCDE");
+  });
+
+  test("returns null for non-Slack URLs", () => {
+    expect(extractSlackTeamId("https://api.unthread.io/api/files/F123/download")).toBeNull();
+    expect(extractSlackTeamId("https://example.com/files-pri/T123/F456/file.pdf")).toBeNull();
+  });
+
+  test("returns null for invalid URLs", () => {
+    expect(extractSlackTeamId("not-a-url")).toBeNull();
+    expect(extractSlackTeamId("")).toBeNull();
   });
 });

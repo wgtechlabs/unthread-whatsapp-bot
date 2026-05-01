@@ -130,11 +130,12 @@ export interface UnthreadQueuedEvent {
 export interface MediaProxyTokenRecord {
   token: string;
   fileId?: string; // Slack-style file ID if present (e.g. "F12345")
-  conversationId?: string; // Unthread conversation ID required for fileId fallback downloads
+  conversationId?: string; // Unthread conversation ID (informational)
+  slackTeamId?: string; // Slack workspace team ID (e.g. "T0123ABCDE"), enables /slack/files endpoint
   fileName: string;
   mimeType: string;
   fileSize?: number;
-  downloadUrl?: string; // Direct download URL (urlPrivateDownload or urlPrivate)
+  downloadUrl?: string; // Direct download URL when file is on the Unthread API origin
   expiresAt: string; // ISO timestamp
 }
 

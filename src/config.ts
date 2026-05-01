@@ -91,6 +91,9 @@ export const config = {
     apiUrl: UNTHREAD_API_URL,
     channelId: requireEnv("UNTHREAD_SLACK_CHANNEL_ID"),
     webhookSecret: optionalEnv("UNTHREAD_WEBHOOK_SECRET", ""),
+    // Slack workspace team ID required for the /slack/files/{id}/thumb download endpoint.
+    // Auto-detected from webhook file URLs when not explicitly set.
+    slackTeamId: optionalEnv("SLACK_TEAM_ID", ""),
   },
 
   storage: {

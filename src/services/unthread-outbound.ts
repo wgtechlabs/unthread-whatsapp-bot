@@ -276,6 +276,22 @@ function isUnthreadApiUrl(url: string): boolean {
   }
 }
 
+// Extract the Slack workspace team ID from a files.slack.com private URL.
+// Slack private file URLs follow the pattern:
+//   https://files.slack.com/files-pri/{teamId}/{fileId}/{filename}
+//   https://files.slack.com/files-tmb/{teamId}/{fileId}/{filename}
+// Returns null when the URL is not a recognizable Slack file URL.
+export function extractSlackTeamId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "files.slack.com") return null;
+    const match = parsed.pathname.match(/^\/files-(?:pri|tmb|prv)\/([A-Z0-9]+)\//);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 // Build a publicly accessible proxy URL for a single outbound file record.
 // Returns null if no public base URL is configured or token storage fails.
 async function buildProxyUrl(
@@ -299,6 +315,12 @@ async function buildProxyUrl(
   const safeDownloadUrl =
     rawDownloadUrl && isUnthreadApiUrl(rawDownloadUrl) ? rawDownloadUrl : undefined;
 
+  // Auto-detect the Slack team ID from the file URL so the media proxy can use
+  // the /slack/files/{id}/thumb endpoint (the proven approach, as in the
+  // unthread-telegram-bot). Fall back to the explicit SLACK_TEAM_ID config value.
+  const teamIdFromUrl = rawDownloadUrl ? extractSlackTeamId(rawDownloadUrl) : null;
+  const slackTeamId = (teamIdFromUrl ?? config.unthread.slackTeamId) || undefined;
+
   // Reject early if there is no resolvable download target: neither a safe URL
   // nor a file ID that can be used with the Unthread file download endpoint.
   // Without at least one of these the proxy endpoint will always 404.
@@ -314,6 +336,7 @@ async function buildProxyUrl(
     const token = await storeProxyToken({
       fileId: file.id,
       conversationId,
+      slackTeamId,
       fileName: sanitizeFileName(file.name),
       mimeType: file.mimetype ?? "application/octet-stream",
       fileSize: file.size,

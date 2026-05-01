@@ -27,9 +27,17 @@ export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): strin
     return meta.downloadUrl;
   }
 
-  // Fall back to the standard Unthread file download endpoint.
-  // See: https://api.unthread.io/api/files/:fileId/download
   if (meta.fileId) {
+    // For image files, prefer Unthread's Slack file proxy endpoint when the Slack
+    // team ID is known. This is the proven approach (mirrors unthread-telegram-bot):
+    //   GET /slack/files/{fileId}/thumb?thumbSize=1024&teamId={teamId}
+    // The team ID is auto-detected from the webhook file URL or set via SLACK_TEAM_ID.
+    if (meta.slackTeamId && meta.mimeType.startsWith("image/")) {
+      return `${config.unthread.apiUrl}/slack/files/${encodeURIComponent(meta.fileId)}/thumb?thumbSize=1024&teamId=${encodeURIComponent(meta.slackTeamId)}`;
+    }
+
+    // Fall back to the generic Unthread file download endpoint for non-image files
+    // or when the Slack team ID is not available.
     return `${config.unthread.apiUrl}/files/${encodeURIComponent(meta.fileId)}/download`;
   }
 
