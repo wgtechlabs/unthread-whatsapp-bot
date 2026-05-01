@@ -220,4 +220,19 @@ describe("outbound file extraction", () => {
       },
     ]);
   });
+
+  test("skips file records without a file ID or private URL", () => {
+    const event: UnthreadQueuedEvent = {
+      type: "message_created",
+      sourcePlatform: "dashboard",
+      targetPlatform: "whatsapp",
+      data: {
+        conversationId: "conv_invalid",
+        body: "Invalid file",
+        files: [{ name: "missing-id.png", mimetype: "image/png" }],
+      },
+    };
+
+    expect(extractFiles(event)).toEqual([]);
+  });
 });

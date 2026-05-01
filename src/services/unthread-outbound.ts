@@ -39,6 +39,10 @@ function readNumber(record: Record<string, unknown>, key: string): number | unde
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function mimeCandidate(value: string): string {
+  return value.includes("/") ? value : "";
+}
+
 function extractConversationId(event: UnthreadQueuedEvent): string {
   const conversation = conversationRecord(event);
   const data = eventDataRecord(event);
@@ -76,16 +80,17 @@ function normalizeOutboundFile(
 
   const id =
     readString(record, "id") || readString(record, "fileId") || readString(record, "file_id");
+  const type = readString(record, "type");
   const mimetype =
     readString(record, "mimetype") ||
     readString(record, "mimeType") ||
-    (readString(record, "type").includes("/") ? readString(record, "type") : "") ||
+    mimeCandidate(type) ||
     attachments?.types?.[index]?.trim();
   const urlPrivate = readString(record, "urlPrivate") || readString(record, "url_private");
   const urlPrivateDownload =
     readString(record, "urlPrivateDownload") || readString(record, "url_private_download");
 
-  if (!name && !id && !urlPrivate && !urlPrivateDownload) return null;
+  if (!id && !urlPrivate && !urlPrivateDownload) return null;
 
   return {
     id: id || undefined,
@@ -100,11 +105,12 @@ function normalizeOutboundFile(
 export function extractFiles(event: UnthreadQueuedEvent): OutboundFileRecord[] {
   const data = eventDataRecord(event);
   const conversation = conversationRecord(event);
-  const rawFiles = Array.isArray(data.files)
-    ? data.files
-    : Array.isArray(conversation.files)
-      ? conversation.files
-      : [];
+  let rawFiles: unknown[] = [];
+  if (Array.isArray(data.files)) {
+    rawFiles = data.files;
+  } else if (Array.isArray(conversation.files)) {
+    rawFiles = conversation.files;
+  }
 
   return rawFiles
     .map((file, index) => normalizeOutboundFile(file, event, index))
@@ -353,8 +359,7 @@ async function buildProxyUrl(
   const fileName =
     file.name || file.title || file.id || file.fileId || file.file_id || "attachment";
   const fileId = file.id || file.fileId || file.file_id;
-  const mimeType =
-    file.mimetype || file.mimeType || (file.type?.includes("/") ? file.type : undefined);
+  const mimeType = file.mimetype || file.mimeType || (file.type ? mimeCandidate(file.type) : "");
   if (!baseUrl) {
     LogEngine.warn(
       "PUBLIC_BASE_URL not configured — cannot build media proxy URL for outbound file",
