@@ -86,11 +86,18 @@ export interface UnthreadMessage {
 // A single file record from the outbound webhook event (unthread-webhook-server format)
 export interface OutboundFileRecord {
   id?: string; // Slack-style file ID (e.g. "F12345")
-  name: string;
+  fileId?: string; // Alternate file ID field from webhook payloads
+  file_id?: string; // Slack-style snake_case file ID
+  name?: string;
+  title?: string;
   size?: number;
   mimetype?: string;
+  mimeType?: string;
+  type?: string;
   urlPrivate?: string;
   urlPrivateDownload?: string;
+  url_private?: string;
+  url_private_download?: string;
 }
 
 // Attachment metadata block from unthread-webhook-server
@@ -112,6 +119,7 @@ export interface UnthreadQueuedEvent {
   data: {
     id?: string;
     conversationId?: string;
+    teamId?: string;
     body?: string;
     content?: string;
     text?: string;

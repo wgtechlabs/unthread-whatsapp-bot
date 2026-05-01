@@ -1,5 +1,15 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import type { OutboundAttachmentsMeta, OutboundFileRecord, UnthreadQueuedEvent } from "../types";
+
+function setRequiredEnv(): void {
+  process.env.TWILIO_ACCOUNT_SID = "AC00000000000000000000000000000000";
+  process.env.TWILIO_AUTH_TOKEN = "test-token";
+  process.env.TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155550123";
+  process.env.TWILIO_WEBHOOK_URL = "https://example.com/webhooks/twilio";
+  process.env.UNTHREAD_API_KEY = "test-unthread-key";
+  process.env.UNTHREAD_SLACK_CHANNEL_ID = "test-channel";
+  process.env.POSTGRES_URL = "******localhost:5432/unthread_whatsapp";
+}
 
 // These tests validate the shape of outbound webhook events and the expected
 // type-level behavior of event classification, without needing to import modules
@@ -128,5 +138,86 @@ describe("UnthreadQueuedEvent outbound event structure", () => {
     expect(file.id).toMatch(/^F/);
     expect(file.urlPrivateDownload).toBeDefined();
     expect(file.mimetype).toBe("image/png");
+  });
+});
+
+describe("outbound file extraction", () => {
+  let extractFiles: typeof import("./unthread-outbound").extractFiles;
+
+  beforeAll(async () => {
+    setRequiredEnv();
+    ({ extractFiles } = await import("./unthread-outbound"));
+  });
+
+  test("normalizes Dashboard file records that use title and metadata MIME fields", () => {
+    const event: UnthreadQueuedEvent = {
+      type: "message_created",
+      sourcePlatform: "dashboard",
+      targetPlatform: "whatsapp",
+      data: {
+        conversationId: "conv_file",
+        teamId: "T0123ABCDE",
+        body: "Image from dashboard",
+        files: [
+          {
+            id: "F12345ABCDE",
+            title: "screenshot",
+            size: 204800,
+            urlPrivate: "https://files.slack.com/files-pri/T0123ABCDE/F12345ABCDE/screenshot.png",
+          },
+        ],
+      },
+      attachments: {
+        hasFiles: true,
+        fileCount: 1,
+        totalSize: 204800,
+        types: ["image/png"],
+        names: ["screenshot.png"],
+      },
+    };
+
+    expect(extractFiles(event)).toEqual([
+      {
+        id: "F12345ABCDE",
+        name: "screenshot",
+        size: 204800,
+        mimetype: "image/png",
+        urlPrivate: "https://files.slack.com/files-pri/T0123ABCDE/F12345ABCDE/screenshot.png",
+        urlPrivateDownload: undefined,
+      },
+    ]);
+  });
+
+  test("reads files from nested conversation payloads", () => {
+    const event: UnthreadQueuedEvent = {
+      type: "message_created",
+      sourcePlatform: "dashboard",
+      targetPlatform: "whatsapp",
+      data: {
+        conversationId: "conv_nested",
+        body: "Nested image",
+        conversation: {
+          files: [
+            {
+              file_id: "F999",
+              name: "nested.png",
+              mimeType: "image/png",
+              url_private: "https://files.slack.com/files-pri/T999/F999/nested.png",
+            },
+          ],
+        },
+      },
+    };
+
+    expect(extractFiles(event)).toEqual([
+      {
+        id: "F999",
+        name: "nested.png",
+        size: undefined,
+        mimetype: "image/png",
+        urlPrivate: "https://files.slack.com/files-pri/T999/F999/nested.png",
+        urlPrivateDownload: undefined,
+      },
+    ]);
   });
 });
