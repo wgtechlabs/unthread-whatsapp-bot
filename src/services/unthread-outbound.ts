@@ -44,7 +44,7 @@ function readArrayString(values: string[] | undefined, index: number): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function mimeCandidate(value: string): string {
+function validMimeType(value: string): string {
   return /^[^/\s]+\/[^/\s]+$/.test(value) ? value : "";
 }
 
@@ -87,7 +87,7 @@ function normalizeOutboundFile(
   const mimetype =
     readString(record, "mimetype") ||
     readString(record, "mimeType") ||
-    mimeCandidate(type) ||
+    validMimeType(type) ||
     readArrayString(attachments?.types, index);
   const urlPrivate = readString(record, "urlPrivate") || readString(record, "url_private");
   const urlPrivateDownload =

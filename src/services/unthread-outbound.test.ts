@@ -261,7 +261,7 @@ describe("outbound file extraction", () => {
     ]);
   });
 
-  test("accepts only valid MIME-shaped type fields", () => {
+  test("accepts only valid MIME type format fields", () => {
     const event: UnthreadQueuedEvent = {
       type: "message_created",
       sourcePlatform: "dashboard",
