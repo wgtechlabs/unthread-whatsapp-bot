@@ -97,7 +97,7 @@ function normalizeOutboundFile(
 
   return {
     id: id || undefined,
-    name: name || "attachment",
+    name,
     size: readNumber(record, "size"),
     mimetype: mimetype || undefined,
     urlPrivate: urlPrivate || undefined,
@@ -359,9 +359,9 @@ async function buildProxyUrl(
   eventTeamId?: string,
 ): Promise<string | null> {
   const baseUrl = config.media.publicBaseUrl;
-  const fileName = file.name || file.title || "attachment";
-  const fileId = file.id || file.fileId || file.file_id;
-  const mimeType = file.mimetype || file.mimeType || (file.type ? mimeCandidate(file.type) : "");
+  const fileName = file.name || "attachment";
+  const fileId = file.id;
+  const mimeType = file.mimetype;
   if (!baseUrl) {
     LogEngine.warn(
       "PUBLIC_BASE_URL not configured — cannot build media proxy URL for outbound file",
@@ -374,8 +374,7 @@ async function buildProxyUrl(
 
   // Only store the raw download URL when it is on the Unthread API origin to
   // prevent SSRF and avoid forwarding the API key to a third-party host.
-  const rawDownloadUrl =
-    file.urlPrivateDownload ?? file.url_private_download ?? file.urlPrivate ?? file.url_private;
+  const rawDownloadUrl = file.urlPrivateDownload ?? file.urlPrivate;
   const safeDownloadUrl =
     rawDownloadUrl && isUnthreadApiUrl(rawDownloadUrl) ? rawDownloadUrl : undefined;
 
@@ -471,8 +470,7 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
   let textSent = false;
   if (files.length > 0) {
     for (const file of files) {
-      const fileName =
-        file.name || file.title || file.id || file.fileId || file.file_id || "attachment";
+      const fileName = file.name || "attachment";
       const proxyUrl = await buildProxyUrl(conversationId, file, eventTeamId || undefined);
       if (!proxyUrl) {
         LogEngine.warn("Skipping outbound file: could not build proxy URL", {
