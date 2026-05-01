@@ -300,11 +300,11 @@ async function buildProxyUrl(
     rawDownloadUrl && isUnthreadApiUrl(rawDownloadUrl) ? rawDownloadUrl : undefined;
 
   // Reject early if there is no resolvable download target: neither a safe URL
-  // nor a file ID that can be used to construct one. Without at least one of
-  // these the proxy endpoint will always 404.
-  if (!safeDownloadUrl && (!file.id || !conversationId)) {
+  // nor a file ID that can be used with the Unthread file download endpoint.
+  // Without at least one of these the proxy endpoint will always 404.
+  if (!safeDownloadUrl && !file.id) {
     LogEngine.warn(
-      "buildProxyUrl: no safe download URL or file fallback metadata available — skipping proxy token",
+      "buildProxyUrl: no safe download URL or file ID available — skipping proxy token",
       { fileName: file.name },
     );
     return null;

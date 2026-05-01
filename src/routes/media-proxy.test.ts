@@ -64,16 +64,24 @@ describe("media proxy download URL resolution", () => {
     );
   });
 
-  test("falls back to conversation-scoped Unthread file endpoint", () => {
+  test("falls back to Unthread file download endpoint when no direct URL is stored", () => {
     const meta = tokenMeta({ fileId: "file_123", conversationId: "conv_123" });
 
     expect(resolveMediaProxyDownloadUrl(meta)).toBe(
-      "https://api.unthread.io/api/conversations/conv_123/files/file_123/full",
+      "https://api.unthread.io/api/files/file_123/download",
     );
   });
 
-  test("returns null without a direct URL or complete fallback metadata", () => {
-    expect(resolveMediaProxyDownloadUrl(tokenMeta({ fileId: "file_123" }))).toBeNull();
+  test("fallback uses only fileId — conversationId is not required", () => {
+    const meta = tokenMeta({ fileId: "file_123" });
+
+    expect(resolveMediaProxyDownloadUrl(meta)).toBe(
+      "https://api.unthread.io/api/files/file_123/download",
+    );
+  });
+
+  test("returns null when neither a direct URL nor a fileId is available", () => {
     expect(resolveMediaProxyDownloadUrl(tokenMeta({ conversationId: "conv_123" }))).toBeNull();
+    expect(resolveMediaProxyDownloadUrl(tokenMeta({}))).toBeNull();
   });
 });

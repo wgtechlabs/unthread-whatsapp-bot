@@ -27,10 +27,10 @@ export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): strin
     return meta.downloadUrl;
   }
 
-  if (meta.fileId && meta.conversationId) {
-    return `${config.unthread.apiUrl}/conversations/${encodeURIComponent(
-      meta.conversationId,
-    )}/files/${encodeURIComponent(meta.fileId)}/full`;
+  // Fall back to the standard Unthread file download endpoint.
+  // See: https://api.unthread.io/api/files/:fileId/download
+  if (meta.fileId) {
+    return `${config.unthread.apiUrl}/files/${encodeURIComponent(meta.fileId)}/download`;
   }
 
   return null;
