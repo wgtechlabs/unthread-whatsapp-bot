@@ -40,7 +40,7 @@ function readNumber(record: Record<string, unknown>, key: string): number | unde
 }
 
 function mimeCandidate(value: string): string {
-  return value.includes("/") ? value : "";
+  return /^[^/\s]+\/[^/\s]+$/.test(value) ? value : "";
 }
 
 function extractConversationId(event: UnthreadQueuedEvent): string {
@@ -74,9 +74,7 @@ function normalizeOutboundFile(
     readString(record, "name") ||
     readString(record, "title") ||
     attachments?.names?.[index]?.trim() ||
-    readString(record, "id") ||
-    readString(record, "fileId") ||
-    readString(record, "file_id");
+    "attachment";
 
   const id =
     readString(record, "id") || readString(record, "fileId") || readString(record, "file_id");
@@ -356,8 +354,7 @@ async function buildProxyUrl(
   eventTeamId?: string,
 ): Promise<string | null> {
   const baseUrl = config.media.publicBaseUrl;
-  const fileName =
-    file.name || file.title || file.id || file.fileId || file.file_id || "attachment";
+  const fileName = file.name || file.title || "attachment";
   const fileId = file.id || file.fileId || file.file_id;
   const mimeType = file.mimetype || file.mimeType || (file.type ? mimeCandidate(file.type) : "");
   if (!baseUrl) {

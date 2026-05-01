@@ -8,7 +8,7 @@ function setRequiredEnv(): void {
   process.env.TWILIO_WEBHOOK_URL = "https://example.com/webhooks/twilio";
   process.env.UNTHREAD_API_KEY = "test-unthread-key";
   process.env.UNTHREAD_SLACK_CHANNEL_ID = "test-channel";
-  process.env.POSTGRES_URL = "******localhost:5432/unthread_whatsapp";
+  process.env.POSTGRES_URL = "postgresql://localhost:5432/test_db";
 }
 
 // These tests validate the shape of outbound webhook events and the expected
