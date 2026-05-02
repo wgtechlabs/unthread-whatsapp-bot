@@ -4,9 +4,13 @@
 
 [![release workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/release.yml?style=flat-square&logo=github&label=release&labelColor=181717)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/release.yml) [![container workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/container.yml?branch=dev&style=flat-square&logo=github&labelColor=181717&label=container)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/container.yml) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![version](https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&labelColor=181717&color=default&style=flat-square&label=version)](https://github.com/wgtechlabs/unthread-whatsapp-bot/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license)
 
-**Official Unthread Extension** — The Unthread WhatsApp Bot connects your WhatsApp Business number with Unthread's powerful ticket management system via Twilio. Customers message your WhatsApp number, messages and file attachments flow into Unthread as tickets, and agent replies (including attachments) are sent back to WhatsApp — with automatic system notifications for ticket creation and status changes.
+Official Unthread Extension for WhatsApp support via Twilio.
 
-This bot is designed for businesses managing customer support through WhatsApp — optimized for professional support workflows with seamless bidirectional communication between your team and customers.
+This integration does three core things:
+
+- Converts inbound WhatsApp messages into Unthread conversations
+- Sends agent replies from Unthread back to WhatsApp
+- Sends automatic status system messages (created, closed, on hold, resumed)
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/CveS2G)
 
@@ -14,67 +18,35 @@ This bot is designed for businesses managing customer support through WhatsApp �
 
 <!-- markdownlint-disable MD033 -->
 | <div align="center">💎 Platinum Sponsor</div> |
-|:-------------------------------------------:|
+| :-----------------------------------------: |
 | <a href="https://unthread.com"><img src="https://raw.githubusercontent.com/wgtechlabs/unthread-discord-bot/main/.github/assets/sponsors/platinum_unthread.png" width="250" alt="Unthread"></a> |
 | <div align="center"><a href="https://unthread.com" target="_blank"><b>Unthread</b></a><br/>Streamlined support ticketing for modern teams.</div> |
 <!-- markdownlint-enable MD033 -->
 
 ## 🤔 How It Works
 
+```text
+Customer (WhatsApp) -> Twilio -> Bot -> Unthread
+                                      |
+Agent (Unthread) <- Webhook Server <- Redis Queue <- Bot
 ```
-Customer (WhatsApp) → Twilio → Bot → Unthread (ticket created)
-                                          ↓
-Agent replies in Unthread → Webhook Server → Redis Queue → Bot → Twilio → Customer (WhatsApp)
-```
 
-### Inbound Flow
-
-1. Customer sends a WhatsApp message
-2. Twilio forwards to the bot's webhook endpoint
-3. Bot resolves or creates an Unthread customer (using phone-based identity)
-4. Bot resolves or creates a conversation (ticket) with the initial message
-5. A "Support Ticket Created" system message is sent to the customer with their ticket number
-
-### Outbound Flow
-
-1. The companion [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-server) receives Unthread events and pushes them to a Redis queue
-2. Bot continuously polls the Redis queue
-3. Agent replies (`message_created`) are forwarded to the customer via Twilio
-4. Status changes (`conversation_updated`) trigger system notifications (closed, on hold, resumed)
-
-### System Messages
-
-Customers receive automatic notifications for ticket lifecycle events:
-
-- **Ticket Created** — confirmation with ticket number when a new conversation is opened
-- **Ticket Closed** — notification when a ticket is closed or resolved
-- **Ticket On Hold** — notification when a ticket is placed on hold
-- **Ticket Resumed** — notification when a ticket moves back to active from hold
-
-## ✨ Key Features
-
-- **Seamless Ticket Creation**: Incoming WhatsApp messages automatically create Unthread support tickets
-- **Bidirectional Communication**: Agent replies in Unthread are forwarded back to the customer via WhatsApp
-- **Bidirectional File Attachments**: Customers can send images and documents via WhatsApp; agents can send files from Unthread/dashboard back to WhatsApp customers
-- **System Notifications**: Automatic WhatsApp messages for ticket lifecycle events (created, closed, on hold, resumed)
-- **Customer Management**: Automatic customer profile creation using phone-based identity
-- **Multi-layer Storage**: [Nuvex](https://github.com/wgtechlabs/nuvex)-powered persistence (Memory + Redis + PostgreSQL)
-- **Webhook Queue Processing**: Redis-based queue consumption from [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-server)
-- **Health Monitoring**: Built-in health check endpoint with storage diagnostics
-- **Docker Ready**: Full-stack `docker-compose.yml` with all required services
+- Inbound path: Twilio calls `POST /webhooks/twilio`, then the bot resolves/creates customer + conversation in Unthread.
+- Outbound path: [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-server) pushes Unthread events to Redis, then this bot forwards replies to WhatsApp.
+- File support: inbound and outbound attachments are supported through media proxy links.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) v1.0+
-- PostgreSQL database
-- Twilio account with WhatsApp sandbox (or approved number)
-- Unthread API key
-- Redis for platform storage/cache
-- Redis for webhook queue (used by [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-server))
+- Bun 1.x
+- Twilio account with WhatsApp sandbox or approved number
+- Unthread API key and channel ID
+- PostgreSQL
+- Redis for webhook queue (required for outbound events)
+- Redis for platform cache (optional, recommended)
 
-### Installation
+### 1) Install
 
 ```bash
 git clone https://github.com/wgtechlabs/unthread-whatsapp-bot.git
@@ -82,112 +54,93 @@ cd unthread-whatsapp-bot
 bun install
 ```
 
-### Configure
-
-Copy `.env.example` to `.env` and fill in your values:
+### 2) Configure
 
 ```bash
 cp .env.example .env
 ```
 
-#### Environment Variables
+Required variables:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NODE_ENV` | Runtime environment. Accepts `dev`/`development` or `prod`/`production`; controls Log Engine verbosity | `development` |
-| `PORT` | Application port | `3000` |
-| `TWILIO_ACCOUNT_SID` | Twilio account ID | — |
-| `TWILIO_AUTH_TOKEN` | Twilio authentication token | — |
-| `TWILIO_WHATSAPP_NUMBER` | Twilio WhatsApp business number | `whatsapp:+14155238886` |
-| `UNTHREAD_API_KEY` | Unthread API key | — |
-| `UNTHREAD_SLACK_CHANNEL_ID` | Target Slack channel for tickets | — |
-| `UNTHREAD_WEBHOOK_SECRET` | Webhook secret (optional) | — |
-| `POSTGRES_URL` | PostgreSQL connection string | — |
-| `REDIS_URL` | Redis for platform caching (optional) | `redis://localhost:6379` |
-| `WEBHOOK_REDIS_URL` | Redis for webhook queue | `redis://localhost:6380` |
+| Variable | Purpose |
+| --- | --- |
+| `TWILIO_ACCOUNT_SID` | Twilio account SID |
+| `TWILIO_AUTH_TOKEN` | Twilio auth token |
+| `TWILIO_WHATSAPP_NUMBER` | Sender WhatsApp number (for example `whatsapp:+14155238886`) |
+| `TWILIO_WEBHOOK_URL` | Public webhook URL for signature validation |
+| `UNTHREAD_API_KEY` | Unthread API key |
+| `UNTHREAD_SLACK_CHANNEL_ID` | Unthread target channel |
+| `POSTGRES_URL` | PostgreSQL connection string |
 
-The Unthread API base URL is hardcoded in the project to `https://api.unthread.io/api` and is not configurable through the environment.
+Important optional variables:
 
-### Run
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `NODE_ENV` | `dev` | `dev`, `development`, `prod`, `production`, `test`, `staging` |
+| `PORT` | `3000` | App port |
+| `REDIS_URL` | empty | Platform cache via Nuvex |
+| `WEBHOOK_REDIS_URL` | empty | Required for webhook queue consumer |
+| `WEBHOOK_QUEUE_NAME` | `unthread-events` | Queue name used by webhook server |
+| `UNTHREAD_WEBHOOK_SECRET` | empty | Optional webhook secret |
+| `SLACK_TEAM_ID` | empty | Optional, auto-detected for Slack file downloads |
+| `PUBLIC_BASE_URL` | derived from `TWILIO_WEBHOOK_URL` | Base URL for media token links |
+| `MEDIA_TOKEN_TTL_SECONDS` | `600` | Media proxy token TTL in seconds |
+| `MAX_ATTACHMENT_SIZE_BYTES` | `16777216` | Max inbound attachment size |
+
+Unthread API base URL is fixed internally to `https://api.unthread.io/api`.
+
+### 3) Run
 
 ```bash
-# Development (with hot reload)
+# development
 bun dev
 
-# Production
+# production
 bun start
 ```
 
-Logging behavior is handled by `@wgtechlabs/log-engine` based on `NODE_ENV`:
+### 4) Point Twilio to the webhook
 
-- `dev` or `development` enables debug logs
-- `prod` or `production` shows info-and-above logs
+In Twilio WhatsApp Sandbox, set:
 
-### Endpoints
+- URL: `https://your-domain.com/webhooks/twilio`
+- Method: `POST`
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/webhooks/twilio` | Twilio WhatsApp incoming messages |
-| GET | `/health` | Health check (status, version, storage health) |
+### 5) Run webhook ingestion for outbound replies
 
-### Twilio Sandbox Setup
+Run [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-server) with `TARGET_PLATFORM=whatsapp`, then in Unthread subscribe to:
 
-1. Go to Twilio Console > Messaging > WhatsApp Sandbox
-2. Set the webhook URL to `https://your-domain.com/webhooks/twilio`
-3. Method: POST
+- `message_created`
+- `conversation_updated`
 
-### Unthread Webhook Setup
+## 🔌 Endpoints
 
-1. Run [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-server) with `TARGET_PLATFORM=whatsapp`
-2. In Unthread, configure a webhook pointing to your webhook-server endpoint:
-   `https://your-domain.com/unthread-webhook`
-3. Subscribe to `message_created` and `conversation_updated` events
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/webhooks/twilio` | Inbound Twilio WhatsApp webhook |
+| `GET` | `/media/:token` | Short-lived media proxy for Twilio |
+| `GET` | `/health` | App, version, and storage health |
 
-### 🐳 Docker Quick Reference
-
-A `docker-compose.yml` is provided with the full stack:
+## 🐳 Docker Quick Start
 
 ```bash
-# Start all services
 docker compose up -d
-
-# View logs
 docker compose logs -f server
+```
 
-# Reset everything (fresh start with clean databases)
+Reset local data:
+
+```bash
 docker compose down -v && docker compose up -d
 ```
 
-> **💡 Tip**: Use `docker compose down -v` to completely reset your local environment. This is safe for development and useful after version upgrades or when you need a clean slate.
+## ✅ Validate Changes
 
-Services included:
-
-| Service | Description | Port |
-|---------|-------------|------|
-| `server` | WhatsApp bot | 3000 |
-| `webhook-server` | Unthread webhook server | 3001 |
-| `postgres-platform` | PostgreSQL 17 | 5432 |
-| `redis-platform` | Redis 8 (platform cache) | 6379 |
-| `redis-webhook` | Redis 8 (webhook queue) | 6380 |
-
-## 🏗️ Architecture
-
-This bot is built with **TypeScript** on the **Bun** runtime for enhanced performance, type safety, and developer experience.
-
-### Technology Stack
-
-- **TypeScript**: For type safety and better code maintainability
-- **Bun**: Fast all-in-one JavaScript runtime
-- **Express.js**: HTTP server for Twilio webhook ingestion
-- **Twilio SDK**: WhatsApp message delivery
-
-**Storage & Performance:**
-- **PostgreSQL**: Primary database via [Nuvex](https://github.com/wgtechlabs/nuvex) multi-layer storage
-- **Redis**: High-performance caching and webhook queue consumption
-
-**Infrastructure:**
-- **Docker Compose**: Complete local development environment with all services
-- **Health Monitoring**: Built-in health check endpoint with storage diagnostics
+```bash
+bun run lint
+bun run typecheck
+bun run test
+```
 
 ## 💬 Community Discussions
 
