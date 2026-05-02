@@ -22,6 +22,10 @@ LogEngine.configure({
       : config.nodeEnv === "test"
         ? LogMode.ERROR
         : LogMode.DEBUG,
+  format: {
+    includeIsoTimestamp: false,
+    includeLocalTime: false,
+  },
 });
 
 async function logStorageDiagnostics(storage: NuvexClient): Promise<void> {
