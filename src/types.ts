@@ -109,6 +109,18 @@ export interface OutboundAttachmentsMeta {
   names?: string[];
 }
 
+export interface UnthreadOutboundMetadata {
+  event_type?: string;
+  event_payload?: {
+    userId?: string;
+    attachments?: unknown[];
+    conversationId?: string;
+    conversationUpdates?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 // Unthread queued event payload from unthread-webhook-server
 export interface UnthreadQueuedEvent {
   platform?: string;
@@ -128,7 +140,8 @@ export interface UnthreadQueuedEvent {
     status?: string;
     previousStatus?: string;
     friendlyId?: UnthreadFriendlyId;
-    files?: OutboundFileRecord[];
+    files?: OutboundFileRecord[] | null;
+    metadata?: UnthreadOutboundMetadata;
     [key: string]: unknown;
   };
   attachments?: OutboundAttachmentsMeta;

@@ -236,7 +236,7 @@ describe("outbound file extraction", () => {
     expect(extractFiles(event)).toEqual([]);
   });
 
-  test("keeps finite numeric sizes and ignores non-finite sizes", () => {
+  test("keeps finite numeric sizes, parses string sizes, and ignores non-finite sizes", () => {
     const event: UnthreadQueuedEvent = {
       type: "message_created",
       sourcePlatform: "dashboard",
@@ -249,6 +249,7 @@ describe("outbound file extraction", () => {
           { id: "F_NAN", name: "nan.png", size: Number.NaN },
           { id: "F_INFINITY", name: "infinity.png", size: Number.POSITIVE_INFINITY },
           { id: "F_STRING", name: "string.png", size: "1234" as unknown as number },
+          { id: "F_INVALID_STRING", name: "invalid.png", size: "abc" as unknown as number },
         ],
       },
     };
@@ -257,6 +258,7 @@ describe("outbound file extraction", () => {
       1234,
       undefined,
       undefined,
+      1234,
       undefined,
     ]);
   });
@@ -305,5 +307,47 @@ describe("outbound file extraction", () => {
     };
 
     expect(extractFiles(event)).toMatchObject([{ name: "metadata.png", mimetype: "image/png" }]);
+  });
+
+  test("reads dashboard attachments from metadata event payload when files is null", () => {
+    const event: UnthreadQueuedEvent = {
+      type: "message_created",
+      sourcePlatform: "dashboard",
+      targetPlatform: "whatsapp",
+      data: {
+        id: "T08DF0UA02H-C08DWG00P25-1777700720.083629",
+        conversationId: "2e9535d1-6890-4df6-9ca1-02aa98c65383",
+        text: "Sending image from dashboard to whatsapp client.",
+        files: null,
+        teamId: "T08DF0UA02H",
+        metadata: {
+          event_type: "message_sent_externally",
+          event_payload: {
+            userId: "4e1cc76a-395e-4f0e-8b37-32ef6484b9ff",
+            attachments: [
+              {
+                id: "2823f8be-c0df-4358-9fa6-bc370ef26057",
+                name: "image.png",
+                size: "1384113",
+                type: "image/png",
+              },
+            ],
+            conversationId: "2e9535d1-6890-4df6-9ca1-02aa98c65383",
+            conversationUpdates: {},
+          },
+        },
+      },
+    };
+
+    expect(extractFiles(event)).toEqual([
+      {
+        id: "2823f8be-c0df-4358-9fa6-bc370ef26057",
+        name: "image.png",
+        size: 1384113,
+        mimetype: "image/png",
+        urlPrivate: undefined,
+        urlPrivateDownload: undefined,
+      },
+    ]);
   });
 });

@@ -9,6 +9,7 @@ import { getProxyToken } from "../services/media-proxy-store";
 import type { MediaProxyTokenRecord } from "../types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SLACK_FILE_ID_PATTERN = /^F[A-Z0-9]+$/;
 
 // Returns true when the given URL is on the configured Unthread API origin.
 // The X-API-KEY credential must only be forwarded to that exact origin.
@@ -32,7 +33,11 @@ export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): strin
     // team ID is known. This is the proven approach (mirrors unthread-telegram-bot):
     //   GET /slack/files/{fileId}/thumb?thumbSize=1024&teamId={teamId}
     // The team ID is auto-detected from the webhook file URL or set via SLACK_TEAM_ID.
-    if (meta.slackTeamId && meta.mimeType.startsWith("image/")) {
+    if (
+      meta.slackTeamId &&
+      meta.mimeType.startsWith("image/") &&
+      SLACK_FILE_ID_PATTERN.test(meta.fileId)
+    ) {
       return `${config.unthread.apiUrl}/slack/files/${encodeURIComponent(meta.fileId)}/thumb?thumbSize=1024&teamId=${encodeURIComponent(meta.slackTeamId)}`;
     }
 

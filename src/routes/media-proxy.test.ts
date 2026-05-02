@@ -79,6 +79,18 @@ describe("media proxy download URL resolution", () => {
     );
   });
 
+  test("image with UUID attachment ID uses /files/{fileId}/download", () => {
+    const meta = tokenMeta({
+      fileId: "2823f8be-c0df-4358-9fa6-bc370ef26057",
+      slackTeamId: "T0123ABCDE",
+      mimeType: "image/png",
+    });
+
+    expect(resolveMediaProxyDownloadUrl(meta)).toBe(
+      "https://api.unthread.io/api/files/2823f8be-c0df-4358-9fa6-bc370ef26057/download",
+    );
+  });
+
   test("image without Slack team ID falls back to /files/{fileId}/download", () => {
     const meta = tokenMeta({ fileId: "F12345ABCDE", mimeType: "image/jpeg" });
 

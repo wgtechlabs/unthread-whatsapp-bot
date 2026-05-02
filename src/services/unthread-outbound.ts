@@ -34,9 +34,18 @@ function readString(record: Record<string, unknown>, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function readNumber(record: Record<string, unknown>, key: string): number | undefined {
+function readFileSize(record: Record<string, unknown>, key: string): number | undefined {
   const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  }
+
+  return undefined;
 }
 
 function readArrayString(values: string[] | undefined, index: number): string {
@@ -44,8 +53,20 @@ function readArrayString(values: string[] | undefined, index: number): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readRecord(record: Record<string, unknown>, key: string): Record<string, unknown> | null {
+  const value = record[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 function validMimeType(value: string): string {
   return /^[^/\s]+\/[^/\s]+$/.test(value) ? value : "";
+}
+
+function metadataEventPayloadRecord(event: UnthreadQueuedEvent): Record<string, unknown> | null {
+  const metadata = readRecord(eventDataRecord(event), "metadata");
+  return metadata ? readRecord(metadata, "event_payload") : null;
 }
 
 function extractConversationId(event: UnthreadQueuedEvent): string {
@@ -56,7 +77,8 @@ function extractConversationId(event: UnthreadQueuedEvent): string {
     readString(conversation, "conversationId") ||
     readString(conversation, "id") ||
     readString(data, "conversationId") ||
-    readString(data, "id")
+    readString(data, "id") ||
+    readString(metadataEventPayloadRecord(event) ?? {}, "conversationId")
   );
 }
 
@@ -98,7 +120,7 @@ function normalizeOutboundFile(
   return {
     id: id || undefined,
     name,
-    size: readNumber(record, "size"),
+    size: readFileSize(record, "size"),
     mimetype: mimetype || undefined,
     urlPrivate: urlPrivate || undefined,
     urlPrivateDownload: urlPrivateDownload || undefined,
@@ -113,6 +135,13 @@ export function extractFiles(event: UnthreadQueuedEvent): OutboundFileRecord[] {
     rawFiles = data.files;
   } else if (Array.isArray(conversation.files)) {
     rawFiles = conversation.files;
+  }
+
+  if (rawFiles.length === 0) {
+    const metadataPayload = metadataEventPayloadRecord(event);
+    if (metadataPayload && Array.isArray(metadataPayload.attachments)) {
+      rawFiles = metadataPayload.attachments;
+    }
   }
 
   return rawFiles
