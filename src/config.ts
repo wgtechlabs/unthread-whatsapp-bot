@@ -10,6 +10,27 @@ function optionalEnv(key: string, fallback: string): string {
   return process.env[key] || fallback;
 }
 
+function optionalIntEnv(key: string, fallback: number): number {
+  const value = process.env[key];
+  if (!value) return fallback;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+// Derive the public base URL for media proxy tokens from TWILIO_WEBHOOK_URL when
+// PUBLIC_BASE_URL is not explicitly provided. Extracts the protocol and host only.
+function resolvePublicBaseUrl(webhookUrl: string): string {
+  const explicit = process.env.PUBLIC_BASE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  try {
+    const parsed = new URL(webhookUrl);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "";
+  }
+}
+
 function optionalBooleanEnv(key: string, fallback: boolean): boolean {
   const value = process.env[key];
   if (value === undefined) {
@@ -70,6 +91,9 @@ export const config = {
     apiUrl: UNTHREAD_API_URL,
     channelId: requireEnv("UNTHREAD_SLACK_CHANNEL_ID"),
     webhookSecret: optionalEnv("UNTHREAD_WEBHOOK_SECRET", ""),
+    // Slack workspace team ID required for the /slack/files/{id}/thumb download endpoint.
+    // Auto-detected from webhook file URLs when not explicitly set.
+    slackTeamId: optionalEnv("SLACK_TEAM_ID", ""),
   },
 
   storage: {
@@ -80,5 +104,15 @@ export const config = {
   webhook: {
     redisUrl: optionalEnv("WEBHOOK_REDIS_URL", ""),
     queueName: optionalEnv("WEBHOOK_QUEUE_NAME", "unthread-events"),
+  },
+
+  media: {
+    // Public base URL for media proxy tokens served to Twilio.
+    // Set PUBLIC_BASE_URL explicitly or derive from TWILIO_WEBHOOK_URL.
+    publicBaseUrl: resolvePublicBaseUrl(process.env.TWILIO_WEBHOOK_URL ?? ""),
+    // How long (seconds) a media proxy token remains valid. Default: 600 (10 minutes).
+    tokenTtlSeconds: optionalIntEnv("MEDIA_TOKEN_TTL_SECONDS", 600),
+    // Maximum inbound attachment size in bytes. Default: 16 MB.
+    maxAttachmentSizeBytes: optionalIntEnv("MAX_ATTACHMENT_SIZE_BYTES", 16 * 1024 * 1024),
   },
 } as const;

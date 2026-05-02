@@ -1,7 +1,12 @@
 import { LogEngine } from "@wgtechlabs/log-engine";
 import { config } from "../config";
+import type {
+  InboundAttachment,
+  UnthreadConversation,
+  UnthreadCustomer,
+  UnthreadMessage,
+} from "../types";
 import { isReusableConversationStatus } from "../types";
-import type { UnthreadConversation, UnthreadCustomer, UnthreadMessage } from "../types";
 import { buildWhatsAppFallbackEmail } from "./whatsapp-identity";
 
 const headers = {
@@ -9,6 +14,25 @@ const headers = {
   "X-API-KEY": config.unthread.apiKey,
 };
 
+export class UnthreadApiError extends Error {
+  readonly status: number;
+  readonly responseBody: string;
+
+  constructor(method: string, path: string, status: number, responseBody: string) {
+    super(`Unthread API ${method} ${path} failed (${status}): ${responseBody}`);
+    this.name = "UnthreadApiError";
+    this.status = status;
+    this.responseBody = responseBody;
+  }
+}
+
+export function isUnthreadApiNotFoundError(error: unknown): error is UnthreadApiError {
+  return error instanceof UnthreadApiError && error.status === 404;
+}
+
+function isFallbackLookupError(error: unknown): error is UnthreadApiError {
+  return error instanceof UnthreadApiError && (error.status === 400 || error.status === 404);
+}
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const url = `${config.unthread.apiUrl}${path}`;
@@ -23,7 +47,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Unthread API ${method} ${path} failed (${res.status}): ${text}`);
+    throw new UnthreadApiError(method, path, res.status, text);
   }
 
   const data = (await res.json()) as T;
@@ -33,19 +57,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 // Search for existing customer by email
 export async function findCustomerByEmail(email: string): Promise<UnthreadCustomer | null> {
-  try {
-    const customers = await request<UnthreadCustomer[]>(
-      "GET",
-      `/customers?email=${encodeURIComponent(email)}`,
-    );
-    return customers.length > 0 ? customers[0] : null;
-  } catch (err) {
-    LogEngine.debug("Failed to find customer by email", {
-      email,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
+  const customers = await request<UnthreadCustomer[]>(
+    "GET",
+    `/customers?email=${encodeURIComponent(email)}`,
+  );
+  return customers.length > 0 ? customers[0] : null;
 }
 
 export async function findCustomerByPhone(phone: string): Promise<UnthreadCustomer | null> {
@@ -62,11 +78,21 @@ export async function findCustomerByPhone(phone: string): Promise<UnthreadCustom
         return exactMatch;
       }
     } catch (err) {
-      LogEngine.debug("Failed to find customer by phone", {
+      if (isFallbackLookupError(err)) {
+        LogEngine.debug("Phone lookup path unavailable, trying fallback", {
+          phone,
+          path,
+          status: err.status,
+        });
+        continue;
+      }
+
+      LogEngine.error("Failed to find customer by phone", {
         phone,
         path,
         error: err instanceof Error ? err.message : String(err),
       });
+      throw err;
     }
   }
 
@@ -139,6 +165,61 @@ export async function addMessage(
   });
 }
 
+// Add a message with file attachments to an existing conversation.
+// Uses multipart FormData with json and attachments fields as expected by the Unthread API.
+export async function addMessageWithAttachments(
+  conversationId: string,
+  message: string,
+  onBehalfOf: { email: string; name: string },
+  attachments: InboundAttachment[],
+): Promise<UnthreadMessage> {
+  const url = `${config.unthread.apiUrl}/conversations/${conversationId}/messages`;
+
+  LogEngine.debug("Unthread API POST multipart", {
+    path: `/conversations/${conversationId}/messages`,
+    attachmentCount: attachments.length,
+  });
+
+  const form = new FormData();
+  form.append(
+    "json",
+    JSON.stringify({
+      body: { type: "markdown", value: message },
+      onBehalfOf: { email: onBehalfOf.email, name: onBehalfOf.name },
+    }),
+  );
+
+  for (const attachment of attachments) {
+    // Convert Buffer to a plain ArrayBuffer to satisfy the Blob constructor's type constraints.
+    const arrayBuffer = attachment.buffer.buffer.slice(
+      attachment.buffer.byteOffset,
+      attachment.buffer.byteOffset + attachment.buffer.byteLength,
+    ) as ArrayBuffer;
+    const blob = new Blob([arrayBuffer], { type: attachment.mimeType });
+    form.append("attachments", blob, attachment.fileName);
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "X-API-KEY": config.unthread.apiKey },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new UnthreadApiError(
+      "POST",
+      `/conversations/${conversationId}/messages`,
+      res.status,
+      text,
+    );
+  }
+
+  const data = (await res.json()) as UnthreadMessage;
+  LogEngine.debug("Unthread API POST multipart response OK");
+  return data;
+}
+
 // Get a conversation by ID
 export async function getConversation(conversationId: string): Promise<UnthreadConversation> {
   return request<UnthreadConversation>("GET", `/conversations/${conversationId}`);
@@ -153,21 +234,25 @@ export async function getCustomer(customerId: string): Promise<UnthreadCustomer>
 export async function findOpenConversationByCustomer(
   customerId: string,
 ): Promise<UnthreadConversation | null> {
+  let conversations: UnthreadConversation[];
+  const path = `/conversations?customerId=${encodeURIComponent(customerId)}`;
+
   try {
-    const conversations = await request<UnthreadConversation[]>(
-      "GET",
-      `/conversations?customerId=${encodeURIComponent(customerId)}`,
-    );
+    conversations = await request<UnthreadConversation[]>("GET", path);
+  } catch (error) {
+    if (isUnthreadApiNotFoundError(error)) {
+      LogEngine.debug("No conversations found for customer", {
+        customerId,
+        path,
+      });
+      return null;
+    }
 
-    // Reuse any active customer-facing conversation status.
-    const open = conversations.find((c) => isReusableConversationStatus(c.status));
-
-    return open ?? null;
-  } catch (err) {
-    LogEngine.debug("Failed to find open conversation for customer", {
-      customerId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
+    throw error;
   }
+
+  // Reuse any active customer-facing conversation status.
+  const open = conversations.find((c) => isReusableConversationStatus(c.status));
+
+  return open ?? null;
 }
