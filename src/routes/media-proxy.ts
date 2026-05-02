@@ -189,9 +189,11 @@ async function resolveAttachmentDownloadUrlFromConversation(
     return null;
   }
 
-  const messagesUrl = `${config.unthread.apiUrl}/conversations/${encodeURIComponent(meta.conversationId)}/messages`;
+  const messagesUrl = `${config.unthread.apiUrl}/conversations/${encodeURIComponent(meta.conversationId)}/messages/list`;
   const response = await fetch(messagesUrl, {
-    headers: { ...headers, Accept: "application/json" },
+    method: "POST",
+    headers: { ...headers, Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ limit: 25, descending: true }),
   });
 
   if (!response.ok) {
@@ -236,8 +238,12 @@ export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): strin
       return `${config.unthread.apiUrl}/slack/files/${encodeURIComponent(meta.fileId)}/thumb?thumbSize=1024&teamId=${encodeURIComponent(meta.slackTeamId)}`;
     }
 
-    // Fall back to the generic Unthread file download endpoint for non-image files
-    // or when the Slack team ID is not available.
+    if (meta.conversationId) {
+      return `${config.unthread.apiUrl}/conversations/${encodeURIComponent(meta.conversationId)}/files/${encodeURIComponent(meta.fileId)}/full`;
+    }
+
+    // Older tokens may not have conversationId. Keep the generic endpoint as a
+    // last-resort fallback for those records.
     return `${config.unthread.apiUrl}/files/${encodeURIComponent(meta.fileId)}/download`;
   }
 
@@ -301,29 +307,9 @@ mediaProxyRouter.get("/:token", async (req: Request, res: ExpressResponse) => {
     // origin, always attach the X-API-KEY credential.
     const headers: Record<string, string> = { "X-API-KEY": config.unthread.apiKey };
 
-    let fileRes: Response | null = null;
-    let triedConversationResolver = false;
+    let fileRes = await fetchUnthreadFileWithRetry(downloadUrl, headers, meta.fileName);
 
-    if (meta.fileId && UUID_PATTERN.test(meta.fileId) && meta.conversationId) {
-      triedConversationResolver = true;
-      const resolvedDownloadUrl = await resolveAttachmentDownloadUrlFromConversation(meta, headers);
-      if (resolvedDownloadUrl) {
-        LogEngine.debug("Media proxy: using resolved attachment download URL", {
-          fileName: meta.fileName,
-        });
-        fileRes = await fetchUnthreadFileWithRetry(resolvedDownloadUrl, headers, meta.fileName);
-      }
-    }
-
-    fileRes ??= await fetchUnthreadFileWithRetry(downloadUrl, headers, meta.fileName);
-
-    if (
-      !fileRes.ok &&
-      fileRes.status === 404 &&
-      meta.fileId &&
-      meta.conversationId &&
-      !triedConversationResolver
-    ) {
+    if (!fileRes.ok && fileRes.status === 404 && meta.fileId && meta.conversationId) {
       const resolvedDownloadUrl = await resolveAttachmentDownloadUrlFromConversation(meta, headers);
       if (resolvedDownloadUrl && resolvedDownloadUrl !== downloadUrl) {
         await fileRes.body?.cancel("Retrying with resolved attachment download URL");

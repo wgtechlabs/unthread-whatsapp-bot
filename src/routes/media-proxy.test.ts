@@ -85,15 +85,16 @@ describe("media proxy download URL resolution", () => {
     );
   });
 
-  test("image with UUID attachment ID uses /files/{fileId}/download", () => {
+  test("image with UUID attachment ID and conversation ID uses conversation file endpoint", () => {
     const meta = tokenMeta({
       fileId: "2823f8be-c0df-4358-9fa6-bc370ef26057",
+      conversationId: "conv_123",
       slackTeamId: "T0123ABCDE",
       mimeType: "image/png",
     });
 
     expect(resolveMediaProxyDownloadUrl(meta)).toBe(
-      "https://api.unthread.io/api/files/2823f8be-c0df-4358-9fa6-bc370ef26057/download",
+      "https://api.unthread.io/api/conversations/conv_123/files/2823f8be-c0df-4358-9fa6-bc370ef26057/full",
     );
   });
 
@@ -117,11 +118,11 @@ describe("media proxy download URL resolution", () => {
     );
   });
 
-  test("falls back to /files/{fileId}/download when no direct URL or team ID stored", () => {
+  test("uses conversation file endpoint when no direct URL or team ID is stored", () => {
     const meta = tokenMeta({ fileId: "file_123", conversationId: "conv_123" });
 
     expect(resolveMediaProxyDownloadUrl(meta)).toBe(
-      "https://api.unthread.io/api/files/file_123/download",
+      "https://api.unthread.io/api/conversations/conv_123/files/file_123/full",
     );
   });
 
