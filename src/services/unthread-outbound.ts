@@ -37,7 +37,7 @@ function readString(record: Record<string, unknown>, key: string): string {
 function readFileSize(record: Record<string, unknown>, key: string): number | undefined {
   const value = record[key];
   if (typeof value === "number") {
-    return Number.isFinite(value) ? value : undefined;
+    return Number.isFinite(value) && value >= 0 ? value : undefined;
   }
 
   if (typeof value === "string") {

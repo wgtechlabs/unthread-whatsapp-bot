@@ -246,6 +246,7 @@ describe("outbound file extraction", () => {
         body: "Sizes",
         files: [
           { id: "F_VALID", name: "valid.png", size: 1234 },
+          { id: "F_NEGATIVE", name: "negative.png", size: -1 },
           { id: "F_NAN", name: "nan.png", size: Number.NaN },
           { id: "F_INFINITY", name: "infinity.png", size: Number.POSITIVE_INFINITY },
           { id: "F_STRING", name: "string.png", size: "1234" as unknown as number },
@@ -256,6 +257,7 @@ describe("outbound file extraction", () => {
 
     expect(extractFiles(event).map((file) => file.size)).toEqual([
       1234,
+      undefined,
       undefined,
       undefined,
       1234,
