@@ -29,6 +29,25 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function readRecordString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readRecordSize(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  }
+
+  return undefined;
+}
+
 export function shouldRetryMediaProxyUpstreamFetch(status: number): boolean {
   return status === 404 || status === 409 || status === 425;
 }
@@ -59,6 +78,144 @@ async function fetchUnthreadFileWithRetry(
   }
 
   throw new Error("Media proxy upstream retry loop exhausted unexpectedly");
+}
+
+function readDownloadUrl(record: Record<string, unknown>): string {
+  return (
+    readRecordString(record, "urlPrivateDownload") ||
+    readRecordString(record, "url_private_download") ||
+    readRecordString(record, "downloadUrl") ||
+    readRecordString(record, "download_url") ||
+    readRecordString(record, "urlPrivate") ||
+    readRecordString(record, "url_private") ||
+    readRecordString(record, "url")
+  );
+}
+
+function findNestedDownloadUrl(value: unknown, depth = 0): string {
+  if (depth > 6 || !value || typeof value !== "object") {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findNestedDownloadUrl(item, depth + 1);
+      if (found) return found;
+    }
+    return "";
+  }
+
+  const record = value as Record<string, unknown>;
+  const directUrl = readDownloadUrl(record);
+  if (directUrl) return directUrl;
+
+  for (const nested of Object.values(record)) {
+    const found = findNestedDownloadUrl(nested, depth + 1);
+    if (found) return found;
+  }
+
+  return "";
+}
+
+function recordMatchesAttachment(
+  record: Record<string, unknown>,
+  meta: MediaProxyTokenRecord,
+): boolean {
+  const ids = ["id", "fileId", "file_id", "attachmentId", "attachment_id"]
+    .map((key) => readRecordString(record, key))
+    .filter(Boolean);
+
+  if (meta.fileId && ids.includes(meta.fileId)) {
+    return true;
+  }
+
+  const names = ["name", "fileName", "filename", "title"]
+    .map((key) => readRecordString(record, key))
+    .filter(Boolean);
+  if (!names.includes(meta.fileName)) {
+    return false;
+  }
+
+  const size = readRecordSize(record, "size") ?? readRecordSize(record, "fileSize");
+  if (meta.fileSize !== undefined && size !== undefined && size !== meta.fileSize) {
+    return false;
+  }
+
+  const mimeType =
+    readRecordString(record, "mimetype") ||
+    readRecordString(record, "mimeType") ||
+    readRecordString(record, "contentType") ||
+    readRecordString(record, "content_type") ||
+    readRecordString(record, "type");
+  return !mimeType || mimeType === meta.mimeType;
+}
+
+export function findAttachmentDownloadUrl(
+  value: unknown,
+  meta: MediaProxyTokenRecord,
+  depth = 0,
+): string {
+  if (depth > 8 || !value || typeof value !== "object") {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findAttachmentDownloadUrl(item, meta, depth + 1);
+      if (found) return found;
+    }
+    return "";
+  }
+
+  const record = value as Record<string, unknown>;
+  if (recordMatchesAttachment(record, meta)) {
+    const url = findNestedDownloadUrl(record);
+    if (url) return url;
+  }
+
+  for (const nested of Object.values(record)) {
+    const found = findAttachmentDownloadUrl(nested, meta, depth + 1);
+    if (found) return found;
+  }
+
+  return "";
+}
+
+async function resolveAttachmentDownloadUrlFromConversation(
+  meta: MediaProxyTokenRecord,
+  headers: Record<string, string>,
+): Promise<string | null> {
+  if (!meta.conversationId || !meta.fileId) {
+    return null;
+  }
+
+  const messagesUrl = `${config.unthread.apiUrl}/conversations/${encodeURIComponent(meta.conversationId)}/messages`;
+  const response = await fetch(messagesUrl, {
+    headers: { ...headers, Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    LogEngine.debug("Media proxy: conversation message lookup failed", {
+      status: response.status,
+      fileName: meta.fileName,
+    });
+    return null;
+  }
+
+  const payload = (await response.json()) as unknown;
+  const downloadUrl = findAttachmentDownloadUrl(payload, meta);
+  if (!downloadUrl) {
+    return null;
+  }
+
+  if (!isUnthreadApiUrl(downloadUrl)) {
+    LogEngine.warn("Media proxy: resolved attachment URL is not on the Unthread API origin", {
+      fileName: meta.fileName,
+    });
+    return null;
+  }
+
+  return downloadUrl;
 }
 
 export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): string | null {
@@ -144,7 +301,38 @@ mediaProxyRouter.get("/:token", async (req: Request, res: ExpressResponse) => {
     // origin, always attach the X-API-KEY credential.
     const headers: Record<string, string> = { "X-API-KEY": config.unthread.apiKey };
 
-    const fileRes = await fetchUnthreadFileWithRetry(downloadUrl, headers, meta.fileName);
+    let fileRes: Response | null = null;
+    let triedConversationResolver = false;
+
+    if (meta.fileId && UUID_PATTERN.test(meta.fileId) && meta.conversationId) {
+      triedConversationResolver = true;
+      const resolvedDownloadUrl = await resolveAttachmentDownloadUrlFromConversation(meta, headers);
+      if (resolvedDownloadUrl) {
+        LogEngine.debug("Media proxy: using resolved attachment download URL", {
+          fileName: meta.fileName,
+        });
+        fileRes = await fetchUnthreadFileWithRetry(resolvedDownloadUrl, headers, meta.fileName);
+      }
+    }
+
+    fileRes ??= await fetchUnthreadFileWithRetry(downloadUrl, headers, meta.fileName);
+
+    if (
+      !fileRes.ok &&
+      fileRes.status === 404 &&
+      meta.fileId &&
+      meta.conversationId &&
+      !triedConversationResolver
+    ) {
+      const resolvedDownloadUrl = await resolveAttachmentDownloadUrlFromConversation(meta, headers);
+      if (resolvedDownloadUrl && resolvedDownloadUrl !== downloadUrl) {
+        await fileRes.body?.cancel("Retrying with resolved attachment download URL");
+        LogEngine.debug("Media proxy: retrying with resolved attachment download URL", {
+          fileName: meta.fileName,
+        });
+        fileRes = await fetchUnthreadFileWithRetry(resolvedDownloadUrl, headers, meta.fileName);
+      }
+    }
 
     if (!fileRes.ok) {
       LogEngine.error("Media proxy: upstream file fetch failed", {
