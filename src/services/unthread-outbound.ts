@@ -34,6 +34,41 @@ function readString(record: Record<string, unknown>, key: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function readFileSize(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  }
+
+  return undefined;
+}
+
+function readArrayString(values: string[] | undefined, index: number): string {
+  const value = values?.[index];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readRecord(record: Record<string, unknown>, key: string): Record<string, unknown> | null {
+  const value = record[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function validMimeType(value: string): string {
+  return /^[^/\s]+\/[^/\s]+$/.test(value) ? value : "";
+}
+
+function metadataEventPayloadRecord(event: UnthreadQueuedEvent): Record<string, unknown> | null {
+  const metadata = readRecord(eventDataRecord(event), "metadata");
+  return metadata ? readRecord(metadata, "event_payload") : null;
+}
+
 function extractConversationId(event: UnthreadQueuedEvent): string {
   const conversation = conversationRecord(event);
   const data = eventDataRecord(event);
@@ -42,7 +77,8 @@ function extractConversationId(event: UnthreadQueuedEvent): string {
     readString(conversation, "conversationId") ||
     readString(conversation, "id") ||
     readString(data, "conversationId") ||
-    readString(data, "id")
+    readString(data, "id") ||
+    readString(metadataEventPayloadRecord(event) ?? {}, "conversationId")
   );
 }
 
@@ -52,13 +88,69 @@ function extractMessage(event: UnthreadQueuedEvent): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function extractFiles(event: UnthreadQueuedEvent): OutboundFileRecord[] {
+function normalizeOutboundFile(
+  file: unknown,
+  event: UnthreadQueuedEvent,
+  index: number,
+): OutboundFileRecord | null {
+  if (!file || typeof file !== "object") return null;
+
+  const record = file as Record<string, unknown>;
+  const attachments = event.attachments;
+  const name =
+    readString(record, "name") ||
+    readString(record, "title") ||
+    readArrayString(attachments?.names, index) ||
+    "attachment";
+
+  const id =
+    readString(record, "id") || readString(record, "fileId") || readString(record, "file_id");
+  const type = readString(record, "type");
+  const mimetype =
+    readString(record, "mimetype") ||
+    readString(record, "mimeType") ||
+    validMimeType(type) ||
+    readArrayString(attachments?.types, index);
+  const urlPrivate = readString(record, "urlPrivate") || readString(record, "url_private");
+  const urlPrivateDownload =
+    readString(record, "urlPrivateDownload") || readString(record, "url_private_download");
+
+  if (!id && !urlPrivate && !urlPrivateDownload) return null;
+
+  return {
+    id: id || undefined,
+    name,
+    size: readFileSize(record, "size"),
+    mimetype: mimetype || undefined,
+    urlPrivate: urlPrivate || undefined,
+    urlPrivateDownload: urlPrivateDownload || undefined,
+  };
+}
+
+export function extractFiles(event: UnthreadQueuedEvent): OutboundFileRecord[] {
   const data = eventDataRecord(event);
-  if (!Array.isArray(data.files)) return [];
-  return data.files.filter(
-    (file): file is OutboundFileRecord =>
-      file !== null && typeof file === "object" && typeof file.name === "string",
-  );
+  const conversation = conversationRecord(event);
+  let rawFiles: unknown[] = [];
+  if (Array.isArray(data.files)) {
+    rawFiles = data.files;
+  } else if (Array.isArray(conversation.files)) {
+    rawFiles = conversation.files;
+  }
+
+  if (rawFiles.length === 0) {
+    // Dashboard-origin Unthread webhooks can arrive while Slack still shows the
+    // "Uploading file" placeholder. In that state data.files is null, but
+    // metadata.event_payload.attachments contains the UUID, name, size, and MIME
+    // type needed by the media proxy's conversation-scoped download endpoint.
+    const metadataPayload = metadataEventPayloadRecord(event);
+    if (metadataPayload && Array.isArray(metadataPayload.attachments)) {
+      rawFiles = metadataPayload.attachments;
+    }
+  }
+
+  return rawFiles
+    .map((file, index) => normalizeOutboundFile(file, event, index))
+    .filter((file): file is OutboundFileRecord => file !== null);
 }
 
 function extractStatus(event: UnthreadQueuedEvent): string {
@@ -276,18 +368,40 @@ function isUnthreadApiUrl(url: string): boolean {
   }
 }
 
+// Extract the Slack workspace team ID from a files.slack.com private URL.
+// Slack private file URLs follow the pattern:
+//   https://files.slack.com/files-pri/{teamId}/{fileId}/{filename}
+//   https://files.slack.com/files-tmb/{teamId}/{fileId}/{filename}
+// Returns null when the URL is not a recognizable Slack file URL.
+export function extractSlackTeamId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "files.slack.com") return null;
+    const match = parsed.pathname.match(/^\/files-(?:pri|tmb|prv)\/([A-Z0-9]+)\//);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 // Build a publicly accessible proxy URL for a single outbound file record.
-// Returns null if no public base URL is configured or token storage fails.
+// Keep this as a tokenized proxy instead of exposing Unthread URLs to Twilio:
+// Twilio needs a public URL, while Unthread downloads require the private API
+// key and must remain constrained to the Unthread API origin.
 async function buildProxyUrl(
   conversationId: string,
   file: OutboundFileRecord,
+  eventTeamId?: string,
 ): Promise<string | null> {
   const baseUrl = config.media.publicBaseUrl;
+  const fileName = file.name || "attachment";
+  const fileId = file.id;
+  const mimeType = file.mimetype;
   if (!baseUrl) {
     LogEngine.warn(
       "PUBLIC_BASE_URL not configured — cannot build media proxy URL for outbound file",
       {
-        fileName: file.name,
+        fileName,
       },
     );
     return null;
@@ -299,30 +413,37 @@ async function buildProxyUrl(
   const safeDownloadUrl =
     rawDownloadUrl && isUnthreadApiUrl(rawDownloadUrl) ? rawDownloadUrl : undefined;
 
+  // Auto-detect the Slack team ID from the file URL so the media proxy can use
+  // the /slack/files/{id}/thumb endpoint (the proven approach, as in the
+  // unthread-telegram-bot). Fall back to the explicit SLACK_TEAM_ID config value.
+  const teamIdFromUrl = rawDownloadUrl ? extractSlackTeamId(rawDownloadUrl) : null;
+  const slackTeamId = (teamIdFromUrl ?? eventTeamId ?? config.unthread.slackTeamId) || undefined;
+
   // Reject early if there is no resolvable download target: neither a safe URL
-  // nor a file ID that can be used to construct one. Without at least one of
-  // these the proxy endpoint will always 404.
-  if (!safeDownloadUrl && (!file.id || !conversationId)) {
+  // nor a file ID that can be combined with conversationId in the media proxy.
+  // Without at least one of these the proxy endpoint will always 404.
+  if (!safeDownloadUrl && !fileId) {
     LogEngine.warn(
-      "buildProxyUrl: no safe download URL or file fallback metadata available — skipping proxy token",
-      { fileName: file.name },
+      "buildProxyUrl: no safe download URL or file ID available — skipping proxy token",
+      { fileName },
     );
     return null;
   }
 
   try {
     const token = await storeProxyToken({
-      fileId: file.id,
+      fileId,
       conversationId,
-      fileName: sanitizeFileName(file.name),
-      mimeType: file.mimetype ?? "application/octet-stream",
+      slackTeamId,
+      fileName: sanitizeFileName(fileName),
+      mimeType: mimeType ?? "application/octet-stream",
       fileSize: file.size,
       downloadUrl: safeDownloadUrl,
     });
     return `${baseUrl}/media/${token}`;
   } catch (error) {
     LogEngine.error("Failed to create media proxy token for outbound file", {
-      fileName: file.name,
+      fileName,
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -350,6 +471,7 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
   const conversationId = extractConversationId(event);
   const message = extractMessage(event);
   const files = extractFiles(event);
+  const eventTeamId = readString(eventDataRecord(event), "teamId");
 
   if (!conversationId) {
     LogEngine.debug("Skipping Unthread event: missing conversationId");
@@ -383,10 +505,11 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
   let textSent = false;
   if (files.length > 0) {
     for (const file of files) {
-      const proxyUrl = await buildProxyUrl(conversationId, file);
+      const fileName = file.name || "attachment";
+      const proxyUrl = await buildProxyUrl(conversationId, file, eventTeamId || undefined);
       if (!proxyUrl) {
         LogEngine.warn("Skipping outbound file: could not build proxy URL", {
-          fileName: file.name,
+          fileName,
           conversationId,
         });
         continue;
@@ -401,7 +524,7 @@ export async function processUnthreadOutboundEvent(event: UnthreadQueuedEvent): 
         LogEngine.info("Outbound file sent to WhatsApp via media proxy", {
           phone,
           conversationId,
-          fileName: file.name,
+          fileName,
         });
       } catch (err: unknown) {
         handleTwilioSendError(err, phone, conversationId);

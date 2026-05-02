@@ -86,11 +86,18 @@ export interface UnthreadMessage {
 // A single file record from the outbound webhook event (unthread-webhook-server format)
 export interface OutboundFileRecord {
   id?: string; // Slack-style file ID (e.g. "F12345")
-  name: string;
+  fileId?: string; // Alternate file ID field from webhook payloads
+  file_id?: string; // Slack-style snake_case file ID
+  name?: string;
+  title?: string;
   size?: number;
   mimetype?: string;
+  mimeType?: string;
+  type?: string;
   urlPrivate?: string;
   urlPrivateDownload?: string;
+  url_private?: string;
+  url_private_download?: string;
 }
 
 // Attachment metadata block from unthread-webhook-server
@@ -100,6 +107,18 @@ export interface OutboundAttachmentsMeta {
   totalSize?: number;
   types?: string[];
   names?: string[];
+}
+
+export interface UnthreadOutboundMetadata {
+  event_type?: string;
+  event_payload?: {
+    userId?: string;
+    attachments?: unknown[];
+    conversationId?: string;
+    conversationUpdates?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
 }
 
 // Unthread queued event payload from unthread-webhook-server
@@ -112,6 +131,7 @@ export interface UnthreadQueuedEvent {
   data: {
     id?: string;
     conversationId?: string;
+    teamId?: string;
     body?: string;
     content?: string;
     text?: string;
@@ -120,21 +140,27 @@ export interface UnthreadQueuedEvent {
     status?: string;
     previousStatus?: string;
     friendlyId?: UnthreadFriendlyId;
-    files?: OutboundFileRecord[];
+    files?: OutboundFileRecord[] | null;
+    metadata?: UnthreadOutboundMetadata;
     [key: string]: unknown;
   };
   attachments?: OutboundAttachmentsMeta;
 }
 
-// Short-lived record stored for a media proxy token
+// Short-lived record stored for a media proxy token.
+// Security invariant: this metadata is the only bridge between Twilio's public
+// media URL and Unthread's private file API. Keep tokens short-lived, keep
+// downloadUrl restricted to the Unthread API origin, and preserve conversationId
+// so dashboard UUID attachments can use /conversations/:id/files/:fileId/full.
 export interface MediaProxyTokenRecord {
   token: string;
-  fileId?: string; // Slack-style file ID if present (e.g. "F12345")
-  conversationId?: string; // Unthread conversation ID required for fileId fallback downloads
+  fileId?: string; // Slack F... ID or dashboard UUID attachment ID
+  conversationId?: string; // Required for dashboard UUID attachment downloads
+  slackTeamId?: string; // Slack workspace team ID (e.g. "T0123ABCDE"), enables /slack/files endpoint
   fileName: string;
   mimeType: string;
   fileSize?: number;
-  downloadUrl?: string; // Direct download URL (urlPrivateDownload or urlPrivate)
+  downloadUrl?: string; // Direct download URL when file is on the Unthread API origin
   expiresAt: string; // ISO timestamp
 }
 

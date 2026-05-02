@@ -43,18 +43,24 @@ export async function sendWhatsAppMediaMessage(
   return message.sid;
 }
 
-// Download a media file from a Twilio media URL using Basic auth credentials.
+// Download a media file from a Twilio media URL.
 // Returns a Buffer along with the response Content-Type.
-// Validates that the URL belongs to Twilio's API domain before sending credentials.
+// Validates that the URL is HTTPS and belongs to a trusted Twilio host.
+// Credentials are only forwarded to api.twilio.com; direct CDN URLs and any
+// cross-origin redirect destination receive no Authorization header.
 export async function downloadTwilioMedia(
   mediaUrl: string,
 ): Promise<{ buffer: Buffer; mimeType: string }> {
-  // Validate that the URL is a trusted Twilio API origin before attaching credentials.
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(mediaUrl);
   } catch {
     throw new Error("Invalid Twilio media URL");
+  }
+
+  // Reject non-HTTPS schemes before any credentials are built or attached.
+  if (parsedUrl.protocol !== "https:") {
+    throw new Error(`Insecure Twilio media URL scheme: ${parsedUrl.protocol}`);
   }
 
   const allowedHosts = ["api.twilio.com", "media.twiliocdn.com"];
@@ -66,12 +72,22 @@ export async function downloadTwilioMedia(
     throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
   }
 
-  const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
-  const authHeader = `Basic ${Buffer.from(credentials).toString("base64")}`;
+  // Only attach credentials when the request goes directly to api.twilio.com.
+  // Direct CDN URLs (media.twiliocdn.com) use pre-signed paths and must not
+  // receive the API credentials. When api.twilio.com redirects to the CDN,
+  // the Fetch spec automatically strips the Authorization header on the
+  // cross-origin hop, so no additional handling is needed for that case.
+  const isApiHost =
+    parsedUrl.hostname === "api.twilio.com" || parsedUrl.hostname.endsWith(".api.twilio.com");
+  const fetchHeaders: Record<string, string> = {};
+  if (isApiHost) {
+    const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
+    fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
+  }
 
   const response = await fetch(parsedUrl.href, {
-    headers: { Authorization: authHeader },
-    redirect: "error",
+    headers: fetchHeaders,
+    redirect: "follow",
   });
 
   if (!response.ok) {
