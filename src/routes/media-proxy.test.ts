@@ -1,6 +1,20 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { MediaProxyTokenRecord } from "../types";
 
+const requiredEnvKeys = [
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_WHATSAPP_NUMBER",
+  "TWILIO_WEBHOOK_URL",
+  "UNTHREAD_API_KEY",
+  "UNTHREAD_SLACK_CHANNEL_ID",
+  "POSTGRES_URL",
+];
+
+const originalEnv = Object.fromEntries(
+  requiredEnvKeys.map((key) => [key, process.env[key]]),
+) as Record<string, string | undefined>;
+
 function setRequiredEnv(): void {
   process.env.TWILIO_ACCOUNT_SID = "AC00000000000000000000000000000000";
   process.env.TWILIO_AUTH_TOKEN = "test-token";
@@ -15,37 +29,24 @@ function setRequiredEnv(): void {
 // the required variables ready, regardless of describe-block execution order.
 setRequiredEnv();
 
+afterAll(() => {
+  for (const [key, value] of Object.entries(originalEnv)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+});
+
 describe("media proxy download URL resolution", () => {
-  const originalEnv: Record<string, string | undefined> = {};
   let resolveMediaProxyDownloadUrl: typeof import("./media-proxy").resolveMediaProxyDownloadUrl;
   let shouldRetryMediaProxyUpstreamFetch: typeof import("./media-proxy").shouldRetryMediaProxyUpstreamFetch;
 
   beforeAll(async () => {
-    const keys = [
-      "TWILIO_ACCOUNT_SID",
-      "TWILIO_AUTH_TOKEN",
-      "TWILIO_WHATSAPP_NUMBER",
-      "TWILIO_WEBHOOK_URL",
-      "UNTHREAD_API_KEY",
-      "UNTHREAD_SLACK_CHANNEL_ID",
-      "POSTGRES_URL",
-    ];
-    for (const key of keys) {
-      originalEnv[key] = process.env[key];
-    }
     ({ resolveMediaProxyDownloadUrl, shouldRetryMediaProxyUpstreamFetch } = await import(
       "./media-proxy"
     ));
-  });
-
-  afterAll(() => {
-    for (const [key, value] of Object.entries(originalEnv)) {
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    }
   });
 
   function tokenMeta(overrides: Partial<MediaProxyTokenRecord>): MediaProxyTokenRecord {
