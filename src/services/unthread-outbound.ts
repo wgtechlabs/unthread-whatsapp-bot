@@ -138,6 +138,10 @@ export function extractFiles(event: UnthreadQueuedEvent): OutboundFileRecord[] {
   }
 
   if (rawFiles.length === 0) {
+    // Dashboard-origin Unthread webhooks can arrive while Slack still shows the
+    // "Uploading file" placeholder. In that state data.files is null, but
+    // metadata.event_payload.attachments contains the UUID, name, size, and MIME
+    // type needed by the media proxy's conversation-scoped download endpoint.
     const metadataPayload = metadataEventPayloadRecord(event);
     if (metadataPayload && Array.isArray(metadataPayload.attachments)) {
       rawFiles = metadataPayload.attachments;
@@ -381,7 +385,9 @@ export function extractSlackTeamId(url: string): string | null {
 }
 
 // Build a publicly accessible proxy URL for a single outbound file record.
-// Returns null if no public base URL is configured or token storage fails.
+// Keep this as a tokenized proxy instead of exposing Unthread URLs to Twilio:
+// Twilio needs a public URL, while Unthread downloads require the private API
+// key and must remain constrained to the Unthread API origin.
 async function buildProxyUrl(
   conversationId: string,
   file: OutboundFileRecord,
@@ -414,7 +420,7 @@ async function buildProxyUrl(
   const slackTeamId = (teamIdFromUrl ?? eventTeamId ?? config.unthread.slackTeamId) || undefined;
 
   // Reject early if there is no resolvable download target: neither a safe URL
-  // nor a file ID that can be used with the Unthread file download endpoint.
+  // nor a file ID that can be combined with conversationId in the media proxy.
   // Without at least one of these the proxy endpoint will always 404.
   if (!safeDownloadUrl && !fileId) {
     LogEngine.warn(

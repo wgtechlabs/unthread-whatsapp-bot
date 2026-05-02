@@ -37,6 +37,9 @@ function buildSlackThumbnailUrl(fileId: string, slackTeamId: string): string {
   return `${config.unthread.apiUrl}/slack/files/${encodeURIComponent(fileId)}/thumb?thumbSize=1024&teamId=${encodeURIComponent(slackTeamId)}`;
 }
 
+// Dashboard-origin attachments use UUID file IDs. These are only downloadable
+// through Unthread's documented conversation-scoped endpoint; the older
+// /files/{fileId}/download path returns persistent 404s for this flow.
 function buildConversationFileUrl(conversationId: string, fileId: string): string {
   return `${config.unthread.apiUrl}/conversations/${encodeURIComponent(conversationId)}/files/${encodeURIComponent(fileId)}/full`;
 }
@@ -79,10 +82,9 @@ export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): strin
   }
 
   if (meta.fileId) {
-    // For image files, prefer Unthread's Slack file proxy endpoint when the Slack
-    // team ID is known. This is the proven approach (mirrors unthread-telegram-bot):
-    //   GET /slack/files/{fileId}/thumb?thumbSize=1024&teamId={teamId}
-    // The team ID is auto-detected from the webhook file URL or set via SLACK_TEAM_ID.
+    // Do not treat every image as a Slack file. Slack thumbnails only work for
+    // Slack file IDs (F...) with a team ID. Dashboard UUID attachments must use
+    // buildConversationFileUrl instead.
     if (
       meta.slackTeamId &&
       meta.mimeType.startsWith("image/") &&
@@ -107,7 +109,9 @@ export const mediaProxyRouter = Router();
 
 // GET /media/:token
 // Fetches and proxies a file stored in Unthread on behalf of Twilio.
-// Tokens are short-lived and stored with TTL in Nuvex/Redis.
+// This route is intentionally narrow: tokens are short-lived, download targets
+// must stay on the Unthread API origin, and the Unthread API key must never be
+// forwarded to arbitrary URLs.
 mediaProxyRouter.get("/:token", async (req: Request, res: ExpressResponse) => {
   const rawToken = req.params.token;
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
@@ -133,8 +137,8 @@ mediaProxyRouter.get("/:token", async (req: Request, res: ExpressResponse) => {
     return;
   }
 
-  // Resolve the download URL. Prefer urlPrivateDownload, fall back to Unthread's
-  // conversation-scoped file endpoint.
+  // Resolve the download URL. Prefer a previously validated direct Unthread URL,
+  // then fall back to the verified conversation-scoped file endpoint.
   const downloadUrl = resolveMediaProxyDownloadUrl(meta);
 
   if (!downloadUrl) {

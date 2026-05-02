@@ -147,11 +147,15 @@ export interface UnthreadQueuedEvent {
   attachments?: OutboundAttachmentsMeta;
 }
 
-// Short-lived record stored for a media proxy token
+// Short-lived record stored for a media proxy token.
+// Security invariant: this metadata is the only bridge between Twilio's public
+// media URL and Unthread's private file API. Keep tokens short-lived, keep
+// downloadUrl restricted to the Unthread API origin, and preserve conversationId
+// so dashboard UUID attachments can use /conversations/:id/files/:fileId/full.
 export interface MediaProxyTokenRecord {
   token: string;
-  fileId?: string; // Slack-style file ID if present (e.g. "F12345")
-  conversationId?: string; // Unthread conversation ID (informational)
+  fileId?: string; // Slack F... ID or dashboard UUID attachment ID
+  conversationId?: string; // Required for dashboard UUID attachment downloads
   slackTeamId?: string; // Slack workspace team ID (e.g. "T0123ABCDE"), enables /slack/files endpoint
   fileName: string;
   mimeType: string;
