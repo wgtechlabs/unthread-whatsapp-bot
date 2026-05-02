@@ -18,6 +18,7 @@ setRequiredEnv();
 describe("media proxy download URL resolution", () => {
   const originalEnv: Record<string, string | undefined> = {};
   let resolveMediaProxyDownloadUrl: typeof import("./media-proxy").resolveMediaProxyDownloadUrl;
+  let shouldRetryMediaProxyUpstreamFetch: typeof import("./media-proxy").shouldRetryMediaProxyUpstreamFetch;
 
   beforeAll(async () => {
     const keys = [
@@ -32,7 +33,9 @@ describe("media proxy download URL resolution", () => {
     for (const key of keys) {
       originalEnv[key] = process.env[key];
     }
-    ({ resolveMediaProxyDownloadUrl } = await import("./media-proxy"));
+    ({ resolveMediaProxyDownloadUrl, shouldRetryMediaProxyUpstreamFetch } = await import(
+      "./media-proxy"
+    ));
   });
 
   afterAll(() => {
@@ -130,6 +133,19 @@ describe("media proxy download URL resolution", () => {
   test("returns null when neither a direct URL nor a fileId is available", () => {
     expect(resolveMediaProxyDownloadUrl(tokenMeta({ conversationId: "conv_123" }))).toBeNull();
     expect(resolveMediaProxyDownloadUrl(tokenMeta({}))).toBeNull();
+  });
+
+  test("retries transient upstream statuses while dashboard uploads finish", () => {
+    expect(shouldRetryMediaProxyUpstreamFetch(404)).toBe(true);
+    expect(shouldRetryMediaProxyUpstreamFetch(409)).toBe(true);
+    expect(shouldRetryMediaProxyUpstreamFetch(425)).toBe(true);
+  });
+
+  test("does not retry permanent upstream failures", () => {
+    expect(shouldRetryMediaProxyUpstreamFetch(400)).toBe(false);
+    expect(shouldRetryMediaProxyUpstreamFetch(401)).toBe(false);
+    expect(shouldRetryMediaProxyUpstreamFetch(403)).toBe(false);
+    expect(shouldRetryMediaProxyUpstreamFetch(500)).toBe(false);
   });
 });
 

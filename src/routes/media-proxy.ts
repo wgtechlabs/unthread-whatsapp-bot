@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { LogEngine } from "@wgtechlabs/log-engine";
-import type { Request, Response } from "express";
+import type { Response as ExpressResponse, Request } from "express";
 import { Router } from "express";
 import { config } from "../config";
 import { sanitizeFileName } from "../services/attachment-validator";
@@ -10,6 +10,8 @@ import type { MediaProxyTokenRecord } from "../types";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLACK_FILE_ID_PATTERN = /^F[A-Z0-9]+$/;
+const UPSTREAM_FETCH_ATTEMPTS = 8;
+const UPSTREAM_FETCH_RETRY_DELAY_MS = 1000;
 
 // Returns true when the given URL is on the configured Unthread API origin.
 // The X-API-KEY credential must only be forwarded to that exact origin.
@@ -21,6 +23,42 @@ function isUnthreadApiUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function shouldRetryMediaProxyUpstreamFetch(status: number): boolean {
+  return status === 404 || status === 409 || status === 425;
+}
+
+async function fetchUnthreadFileWithRetry(
+  downloadUrl: string,
+  headers: Record<string, string>,
+  fileName: string,
+): Promise<Response> {
+  for (let attempt = 1; attempt <= UPSTREAM_FETCH_ATTEMPTS; attempt++) {
+    const response = await fetch(downloadUrl, { headers });
+    if (
+      response.ok ||
+      !shouldRetryMediaProxyUpstreamFetch(response.status) ||
+      attempt === UPSTREAM_FETCH_ATTEMPTS
+    ) {
+      return response;
+    }
+
+    await response.body?.cancel(`Retrying transient upstream status ${response.status}`);
+    LogEngine.debug("Media proxy: upstream file not ready, retrying", {
+      status: response.status,
+      fileName,
+      attempt,
+      maxAttempts: UPSTREAM_FETCH_ATTEMPTS,
+    });
+    await delay(UPSTREAM_FETCH_RETRY_DELAY_MS);
+  }
+
+  throw new Error("Media proxy upstream retry loop exhausted unexpectedly");
 }
 
 export function resolveMediaProxyDownloadUrl(meta: MediaProxyTokenRecord): string | null {
@@ -54,7 +92,7 @@ export const mediaProxyRouter = Router();
 // GET /media/:token
 // Fetches and proxies a file stored in Unthread on behalf of Twilio.
 // Tokens are short-lived and stored with TTL in Nuvex/Redis.
-mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
+mediaProxyRouter.get("/:token", async (req: Request, res: ExpressResponse) => {
   const rawToken = req.params.token;
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
 
@@ -106,7 +144,7 @@ mediaProxyRouter.get("/:token", async (req: Request, res: Response) => {
     // origin, always attach the X-API-KEY credential.
     const headers: Record<string, string> = { "X-API-KEY": config.unthread.apiKey };
 
-    const fileRes = await fetch(downloadUrl, { headers });
+    const fileRes = await fetchUnthreadFileWithRetry(downloadUrl, headers, meta.fileName);
 
     if (!fileRes.ok) {
       LogEngine.error("Media proxy: upstream file fetch failed", {
