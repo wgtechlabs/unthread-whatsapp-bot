@@ -17,7 +17,6 @@ setRequiredEnv();
 
 describe("media proxy download URL resolution", () => {
   const originalEnv: Record<string, string | undefined> = {};
-  let findAttachmentDownloadUrl: typeof import("./media-proxy").findAttachmentDownloadUrl;
   let resolveMediaProxyDownloadUrl: typeof import("./media-proxy").resolveMediaProxyDownloadUrl;
   let shouldRetryMediaProxyUpstreamFetch: typeof import("./media-proxy").shouldRetryMediaProxyUpstreamFetch;
 
@@ -34,11 +33,9 @@ describe("media proxy download URL resolution", () => {
     for (const key of keys) {
       originalEnv[key] = process.env[key];
     }
-    ({
-      findAttachmentDownloadUrl,
-      resolveMediaProxyDownloadUrl,
-      shouldRetryMediaProxyUpstreamFetch,
-    } = await import("./media-proxy"));
+    ({ resolveMediaProxyDownloadUrl, shouldRetryMediaProxyUpstreamFetch } = await import(
+      "./media-proxy"
+    ));
   });
 
   afterAll(() => {
@@ -106,15 +103,16 @@ describe("media proxy download URL resolution", () => {
     );
   });
 
-  test("non-image with Slack team ID uses /files/{fileId}/download (not thumb)", () => {
+  test("non-image with Slack team ID and conversation ID uses conversation file endpoint", () => {
     const meta = tokenMeta({
       fileId: "F12345ABCDE",
+      conversationId: "conv_123",
       slackTeamId: "T0123ABCDE",
       mimeType: "application/pdf",
     });
 
     expect(resolveMediaProxyDownloadUrl(meta)).toBe(
-      "https://api.unthread.io/api/files/F12345ABCDE/download",
+      "https://api.unthread.io/api/conversations/conv_123/files/F12345ABCDE/full",
     );
   });
 
@@ -150,83 +148,6 @@ describe("media proxy download URL resolution", () => {
     expect(shouldRetryMediaProxyUpstreamFetch(401)).toBe(false);
     expect(shouldRetryMediaProxyUpstreamFetch(403)).toBe(false);
     expect(shouldRetryMediaProxyUpstreamFetch(500)).toBe(false);
-  });
-
-  test("finds direct attachment download URL by UUID inside conversation messages", () => {
-    const meta = tokenMeta({
-      fileId: "8bb2fdd8-e6dc-4e73-a8dc-1f7cfe934cae",
-      fileName: "image.png",
-      fileSize: 1707977,
-      mimeType: "image/png",
-    });
-    const messagesPayload = [
-      {
-        id: "msg_1",
-        attachments: [
-          {
-            id: "8bb2fdd8-e6dc-4e73-a8dc-1f7cfe934cae",
-            filename: "image.png",
-            size: "1707977",
-            content_type: "image/png",
-            url: "https://api.unthread.io/api/attachments/8bb2fdd8-e6dc-4e73-a8dc-1f7cfe934cae/download",
-          },
-        ],
-      },
-    ];
-
-    expect(findAttachmentDownloadUrl(messagesPayload, meta)).toBe(
-      "https://api.unthread.io/api/attachments/8bb2fdd8-e6dc-4e73-a8dc-1f7cfe934cae/download",
-    );
-  });
-
-  test("finds direct attachment download URL by matching name, size, and MIME type", () => {
-    const meta = tokenMeta({
-      fileId: "metadata-only-id",
-      fileName: "image.png",
-      fileSize: 1707977,
-      mimeType: "image/png",
-    });
-    const messagesPayload = {
-      data: [
-        {
-          files: [
-            {
-              id: "different-id",
-              name: "image.png",
-              size: 1707977,
-              mimetype: "image/png",
-              downloadUrl: "https://api.unthread.io/api/generated-download/image.png",
-            },
-          ],
-        },
-      ],
-    };
-
-    expect(findAttachmentDownloadUrl(messagesPayload, meta)).toBe(
-      "https://api.unthread.io/api/generated-download/image.png",
-    );
-  });
-
-  test("returns empty string when no conversation attachment matches", () => {
-    const meta = tokenMeta({
-      fileId: "8bb2fdd8-e6dc-4e73-a8dc-1f7cfe934cae",
-      fileName: "image.png",
-      fileSize: 1707977,
-      mimeType: "image/png",
-    });
-
-    expect(
-      findAttachmentDownloadUrl(
-        [
-          {
-            attachments: [
-              { id: "other-id", name: "other.png", url: "https://api.unthread.io/api/other" },
-            ],
-          },
-        ],
-        meta,
-      ),
-    ).toBe("");
   });
 });
 
