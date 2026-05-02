@@ -8,6 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.3.0] - 2026-05-02
+
+### Added
+
+- add conversationId field to MediaProxyTokenRecord
+- bidirectional file attachment support (WhatsApp ↔ Unthread) (#8)
+
+### Changed
+
+- add route proxy tests
+- extend claim outbound deletion and add tests
+- fix edge case handling
+- add validation logic and tests
+- disable iso and local timestamps in log output
+- reformat long function call arguments
+- update test fixtures and env setup
+- update proxy URL building with conversationId
+- resolve downloads via conversation-scoped file URL
+- export media helpers and thread attachments through fallback recovery
+- support attachments in fallback email forwarding
+- add pendingAttachments to email collection state
+- handle 404 as null in findOpenConversationByCustomer
+- use GH_PAT directly to trigger downstream workflows (#7)
+- harden inbound fallback handling (#6)
+- harden inbound fallback handling
+
+### Fixed
+
+- restore correct Unthread file download endpoint and use Slack thumb API for images (#10)
+
+### Security
+
+- address all PR review security and reliability issues
+- add Dockerfile HEALTHCHECK instruction (#4)
+
 ## [1.2.3] - 2026-04-15
 
 ### Security
