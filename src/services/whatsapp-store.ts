@@ -540,6 +540,10 @@ export async function claimOutboundDelivery(
   deliveryKey: string,
   ttlSeconds: number,
 ): Promise<boolean> {
+  if (!Number.isFinite(ttlSeconds) || !Number.isInteger(ttlSeconds) || ttlSeconds <= 0) {
+    throw new Error("Invalid ttlSeconds");
+  }
+
   const now = Date.now();
   const cachedExpiresAt = outboundDeliveryCache.get(deliveryKey);
   if (cachedExpiresAt && cachedExpiresAt > now) {

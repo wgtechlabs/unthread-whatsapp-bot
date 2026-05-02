@@ -188,4 +188,19 @@ describe("claimOutboundDelivery", () => {
     await expect(claimOutboundDelivery("fingerprint-2", 120)).resolves.toBe(true);
     await expect(claimOutboundDelivery("fingerprint-3", 120)).resolves.toBe(true);
   });
+
+  test("rejects invalid outbound delivery TTL values", async () => {
+    await expect(claimOutboundDelivery("fingerprint-invalid-zero", 0)).rejects.toThrow(
+      "Invalid ttlSeconds",
+    );
+    await expect(claimOutboundDelivery("fingerprint-invalid-negative", -1)).rejects.toThrow(
+      "Invalid ttlSeconds",
+    );
+    await expect(claimOutboundDelivery("fingerprint-invalid-fraction", 1.5)).rejects.toThrow(
+      "Invalid ttlSeconds",
+    );
+    await expect(
+      claimOutboundDelivery("fingerprint-invalid-infinity", Number.POSITIVE_INFINITY),
+    ).rejects.toThrow("Invalid ttlSeconds");
+  });
 });
