@@ -58,6 +58,12 @@ describe("attachment-validator", () => {
       expect(result.reason).toContain("empty");
     });
 
+    test("rejects negative file sizes", () => {
+      const result = validateAttachmentSize("image/jpeg", -1, maxBytes);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain("invalid size");
+    });
+
     test("rejects images over 5 MB even when general limit is higher", () => {
       const sixMb = 6 * 1024 * 1024;
       const result = validateAttachmentSize("image/jpeg", sixMb, maxBytes);
@@ -119,6 +125,22 @@ describe("attachment-validator", () => {
       expect(fileNameFromMimeType("image/jpeg")).toBe("image.jpg");
       expect(fileNameFromMimeType("application/pdf")).toBe("document.pdf");
       expect(fileNameFromMimeType("audio/mpeg")).toBe("audio.mp3");
+      expect(fileNameFromMimeType("application/msword")).toBe("document.doc");
+      expect(
+        fileNameFromMimeType(
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+      ).toBe("document.docx");
+      expect(fileNameFromMimeType("application/vnd.ms-excel")).toBe("spreadsheet.xls");
+      expect(
+        fileNameFromMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+      ).toBe("spreadsheet.xlsx");
+      expect(fileNameFromMimeType("application/vnd.ms-powerpoint")).toBe("presentation.ppt");
+      expect(
+        fileNameFromMimeType(
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ),
+      ).toBe("presentation.pptx");
     });
 
     test("returns 'attachment' for unknown MIME types", () => {

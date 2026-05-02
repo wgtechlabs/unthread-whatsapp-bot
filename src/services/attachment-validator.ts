@@ -48,8 +48,8 @@ export function validateAttachmentSize(
   sizeBytes: number,
   maxBytes: number,
 ): AttachmentValidationResult {
-  if (sizeBytes === 0) {
-    return { valid: false, reason: "Attachment is empty" };
+  if (sizeBytes <= 0) {
+    return { valid: false, reason: "Attachment is empty or has invalid size" };
   }
 
   const normalized = normalizeMimeType(mimeType);
@@ -107,6 +107,13 @@ export function fileNameFromMimeType(mimeType: string): string {
     "video/3gp": "video.3gp",
     "application/pdf": "document.pdf",
     "text/plain": "file.txt",
+    "application/msword": "document.doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document.docx",
+    "application/vnd.ms-excel": "spreadsheet.xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "spreadsheet.xlsx",
+    "application/vnd.ms-powerpoint": "presentation.ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      "presentation.pptx",
   };
   return mimeExtensions[normalized] ?? "attachment";
 }
