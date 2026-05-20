@@ -27,6 +27,11 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Node runtime smoke test
+        run: |
+          test "$(node -p "process.versions.node.split('.')[0]")" = "${{ matrix.node-version }}"
+          node -e "fetch('data:text/plain,ok').then((res)=>res.text()).then((text)=>process.exit(text === 'ok' ? 0 : 1)).catch(()=>process.exit(1));"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:

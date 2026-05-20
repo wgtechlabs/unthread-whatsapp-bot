@@ -11,6 +11,7 @@ FROM node:${NODE_VERSION} AS base
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /usr/src/app
+RUN apk add --no-cache dumb-init
 
 FROM base AS deps
 
@@ -34,4 +35,5 @@ USER app
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["node", "-e", "const port=process.env.PORT||3000;fetch(`http://localhost:${port}/health`).then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1));"]
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["bun", "src/index.ts"]
