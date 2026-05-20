@@ -2,45 +2,55 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
 
-# Note: these permissions apply to the built-in GITHUB_TOKEN only.
-# GH_PAT is a Personal Access Token and is not constrained by this block.
-# Required PAT scopes: contents (write), pull-requests (write), workflow.
-permissions:
-  contents: write
-  pull-requests: write
+concurrency:
+  group: Release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  ci:
+    name: CI Gate
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+    permissions:
+      contents: read
+
+  codeql:
+    name: CodeQL Gate
+    uses: ./.github/workflows/codeql.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
   release:
+    name: Create Release
     runs-on: ubuntu-latest
+    needs: [ ci, codeql ]
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
-      - name: Verify GH_PAT is set
-        run: |
-          if [ -z "${{ secrets.GH_PAT }}" ]; then
-            echo "::error::GH_PAT secret is not set. A Personal Access Token with 'contents' (write), 'pull-requests' (write), and 'workflow' scopes is required to trigger downstream workflows."
-            exit 1
-          fi
-
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Create release
+      - name: Verify GH_PAT is set
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$GH_PAT" ]; then
+            echo "::error::GH_PAT secret is required."
+            exit 1
+          fi
+
+      - name: Create Release
         id: release
         uses: wgtechlabs/release-build-flow-action@v1.7.0
         with:
-          # Use GH_PAT to allow downstream release-triggered workflows.
-          # Required PAT scopes: contents (write), pull-requests (write), workflow.
           github-token: ${{ secrets.GH_PAT }}
           commit-convention: clean-commit
-
-      - name: Release summary
-        if: steps.release.outputs.version-bump-type != 'none'
-        run: |
-          echo "Version: ${{ steps.release.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Tag: ${{ steps.release.outputs.version-tag }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "URL: ${{ steps.release.outputs.release-url }}" >> "$GITHUB_STEP_SUMMARY"
