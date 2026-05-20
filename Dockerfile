@@ -3,10 +3,12 @@
 ARG NODE_VERSION=26-alpine3.22
 ARG BUN_VERSION=1.3.9
 
+FROM oven/bun:${BUN_VERSION}-alpine AS bun
+
 # Base image uses Node.js 26 Alpine.
 FROM node:${NODE_VERSION} AS base
 
-RUN npm install -g bun@${BUN_VERSION}
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /usr/src/app
 
