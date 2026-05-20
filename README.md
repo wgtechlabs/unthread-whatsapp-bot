@@ -39,6 +39,7 @@ Agent (Unthread) <- Webhook Server <- Redis Queue <- Bot
 
 ### Prerequisites
 
+- Node.js 22, 24, or 26 (default runtime: Node.js 26)
 - Bun 1.x
 - Twilio account with WhatsApp sandbox or approved number
 - Unthread API key and channel ID
@@ -122,6 +123,8 @@ Run [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-ser
 | `GET` | `/health` | App, version, and storage health |
 
 ## 🐳 Docker Quick Start
+
+Docker images use Node.js 26 Alpine as the base runtime (with Bun installed for the app toolchain).
 
 ```bash
 docker compose up -d

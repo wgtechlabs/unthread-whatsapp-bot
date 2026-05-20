@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
+ARG NODE_VERSION=26-alpine3.22
 ARG BUN_VERSION=1.3.9
 
-FROM oven/bun:${BUN_VERSION}-alpine AS base
+# Base image uses Node.js 26 Alpine.
+FROM node:${NODE_VERSION} AS base
 
-RUN apk update && apk upgrade && \
-    apk add --no-cache dumb-init wget && \
-    rm -rf /var/cache/apk/*
+RUN npm install -g bun@${BUN_VERSION}
 
 WORKDIR /usr/src/app
 
@@ -31,8 +31,5 @@ USER app
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD wget --quiet --spider --tries=1 "http://localhost:${PORT:-3000}/health" || exit 1
-
-ENTRYPOINT ["dumb-init", "--"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["node", "-e", "const port=process.env.PORT||3000;fetch(`http://localhost:${port}/health`).then((res)=>process.exit(res.ok?0:1)).catch(()=>process.exit(1));"]
 CMD ["bun", "src/index.ts"]
