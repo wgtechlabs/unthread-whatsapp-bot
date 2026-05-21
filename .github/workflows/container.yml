@@ -43,7 +43,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Build Container (PR validation only)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: docker build -t test-build .
+
       - name: Build and Push Container
+        if: ${{ github.event_name != 'pull_request' }}
         uses: wgtechlabs/container-build-flow-action@v1.8.1
         with:
           registry: both
