@@ -33,6 +33,7 @@ jobs:
       enable-container: true
       container-registry: both
       container-floating-tags: true
+      container-release-platforms: linux/amd64
 
   publish-latest-tags:
     name: Publish latest container tags
