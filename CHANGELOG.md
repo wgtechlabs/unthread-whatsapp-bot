@@ -7,10 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [1.3.1] - 2026-07-15
+
 ### Changed
 
+- migrate workflows to build-flow-action (#13)
+- align Node.js runtime policy with 26 default (22/24/26 support) (#12)
+- update CHANGELOG.md for v1.3.0
 - update readme to clarify integration flow and core features
 - update container build action and enable floating tags
+
+### Security
+
+- upgrade node base image to 26.5.0 to fix CVE-2026-12151
+- fix high-severity CVEs in axios, form-data, undici, and openssl
+- add id-token write permission for OIDC provenance
 
 ## [1.3.0] - 2026-05-02
 
