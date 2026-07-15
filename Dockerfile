@@ -11,7 +11,7 @@ FROM node:${NODE_VERSION} AS base
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /usr/src/app
-RUN apk add --no-cache dumb-init
+RUN apk upgrade --no-cache && apk add --no-cache dumb-init
 
 FROM base AS deps
 
