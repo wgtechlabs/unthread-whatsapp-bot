@@ -2,7 +2,7 @@
 
 [![banner](https://ghrb.waren.build/banner?header=Unthread+WhatsApp+Bot+%F0%9F%93%B1&subheader=Official+Unthread+support+bot+for+WhatsApp+via+Twilio&bg=013B84-016EEA&color=FFFFFF)](https://github.com/wgtechlabs/unthread-whatsapp-bot)
 
-[![release workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/release.yml?style=flat-square&logo=github&label=release&labelColor=181717)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/release.yml) [![container workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/container.yml?branch=dev&style=flat-square&logo=github&labelColor=181717&label=container)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/container.yml) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![version](https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&labelColor=181717&color=default&style=flat-square&label=version)](https://github.com/wgtechlabs/unthread-whatsapp-bot/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license)
+[![build flow workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/build-flow.yml?branch=dev&style=flat-square&logo=github&labelColor=181717&label=build%20flow)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/build-flow.yml) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![version](https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&labelColor=181717&color=default&style=flat-square&label=version)](https://github.com/wgtechlabs/unthread-whatsapp-bot/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license)
 
 Official Unthread Extension for WhatsApp support via Twilio.
 
@@ -39,6 +39,7 @@ Agent (Unthread) <- Webhook Server <- Redis Queue <- Bot
 
 ### Prerequisites
 
+- Node.js 22, 24, or 26 (default runtime: Node.js 26)
 - Bun 1.x
 - Twilio account with WhatsApp sandbox or approved number
 - Unthread API key and channel ID
@@ -122,6 +123,8 @@ Run [unthread-webhook-server](https://github.com/wgtechlabs/unthread-webhook-ser
 | `GET` | `/health` | App, version, and storage health |
 
 ## 🐳 Docker Quick Start
+
+Docker images use Node.js 26 Alpine as the base runtime (with Bun installed for the app toolchain).
 
 ```bash
 docker compose up -d
