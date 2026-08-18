@@ -63,12 +63,19 @@ export async function downloadTwilioMedia(
     throw new Error(`Insecure Twilio media URL scheme: ${parsedUrl.protocol}`);
   }
 
-  // Use exact-match allowlist for Twilio media hosts.
-  // matchedHost is a server-controlled constant from the allowedHosts array so the
-  // hostname used to construct the final fetch URL is never tainted by user input.
-  const allowedHosts = ["api.twilio.com", "media.twiliocdn.com"] as const;
-  const matchedHost = allowedHosts.find((host) => parsedUrl.hostname === host);
-  if (!matchedHost) {
+  // Validate the hostname against an exact-match allowlist. The fetch URL is then
+  // reconstructed in each branch using a hard-coded literal base (server-controlled),
+  // so the hostname that reaches fetch() is never derived from user-provided input.
+  const pathAndQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  let safeUrl: URL;
+  let isApiHost: boolean;
+  if (parsedUrl.hostname === "api.twilio.com") {
+    safeUrl = new URL(pathAndQuery, "https://api.twilio.com");
+    isApiHost = true;
+  } else if (parsedUrl.hostname === "media.twiliocdn.com") {
+    safeUrl = new URL(pathAndQuery, "https://media.twiliocdn.com");
+    isApiHost = false;
+  } else {
     throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
   }
 
@@ -77,21 +84,11 @@ export async function downloadTwilioMedia(
   // receive the API credentials. When api.twilio.com redirects to the CDN,
   // the Fetch spec automatically strips the Authorization header on the
   // cross-origin hop, so no additional handling is needed for that case.
-  const isApiHost = matchedHost === "api.twilio.com";
   const fetchHeaders: Record<string, string> = {};
   if (isApiHost) {
     const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
     fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
   }
-
-  // Reconstruct the request URL using the server-controlled matched host for the
-  // authority, combined with the path and query from the parsed URL. The hostname is
-  // sourced from the allowedHosts constant array, not from user-provided input, which
-  // prevents SSRF via a malicious host value.
-  const safeUrl = new URL(
-    `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`,
-    `https://${matchedHost}`,
-  );
 
   const response = await fetch(safeUrl, {
     headers: fetchHeaders,
