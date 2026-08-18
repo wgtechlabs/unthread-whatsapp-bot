@@ -66,7 +66,7 @@ export async function downloadTwilioMedia(
   // Validate the hostname against an exact-match allowlist. The fetch URL is then
   // reconstructed using a hard-coded literal base (server-controlled), so the hostname
   // that reaches fetch() is never derived from user-provided input.
-  const pathAndQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  const pathAndQuery = `${parsedUrl.pathname}${parsedUrl.search}`;
   const isApiHost = parsedUrl.hostname === "api.twilio.com";
   if (!isApiHost && parsedUrl.hostname !== "media.twiliocdn.com") {
     throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
