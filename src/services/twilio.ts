@@ -64,20 +64,17 @@ export async function downloadTwilioMedia(
   }
 
   // Validate the hostname against an exact-match allowlist. The fetch URL is then
-  // reconstructed in each branch using a hard-coded literal base (server-controlled),
-  // so the hostname that reaches fetch() is never derived from user-provided input.
+  // reconstructed using a hard-coded literal base (server-controlled), so the hostname
+  // that reaches fetch() is never derived from user-provided input.
   const pathAndQuery = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
-  let safeUrl: URL;
-  let isApiHost: boolean;
-  if (parsedUrl.hostname === "api.twilio.com") {
-    safeUrl = new URL(pathAndQuery, "https://api.twilio.com");
-    isApiHost = true;
-  } else if (parsedUrl.hostname === "media.twiliocdn.com") {
-    safeUrl = new URL(pathAndQuery, "https://media.twiliocdn.com");
-    isApiHost = false;
-  } else {
+  const isApiHost = parsedUrl.hostname === "api.twilio.com";
+  if (!isApiHost && parsedUrl.hostname !== "media.twiliocdn.com") {
     throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
   }
+  // Each branch uses a literal base URL so the host is a server-controlled constant.
+  const safeUrl = isApiHost
+    ? new URL(pathAndQuery, "https://api.twilio.com")
+    : new URL(pathAndQuery, "https://media.twiliocdn.com");
 
   // Only attach credentials when the request goes directly to api.twilio.com.
   // Direct CDN URLs (media.twiliocdn.com) use pre-signed paths and must not
