@@ -85,7 +85,7 @@ export async function downloadTwilioMedia(
     fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
   }
 
-  const response = await fetch(parsedUrl.href, {
+  const response = await fetch(parsedUrl, {
     headers: fetchHeaders,
     redirect: "follow",
   });
