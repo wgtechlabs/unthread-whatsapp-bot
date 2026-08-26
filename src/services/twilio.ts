@@ -51,6 +51,8 @@ export async function sendWhatsAppMediaMessage(
 export async function downloadTwilioMedia(
   mediaUrl: string,
 ): Promise<{ buffer: Buffer; mimeType: string }> {
+  // Parse first so malformed strings ("not-a-url") get a clear, distinct
+  // error rather than silently falling through to the scheme/host checks.
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(mediaUrl);
@@ -63,29 +65,24 @@ export async function downloadTwilioMedia(
     throw new Error(`Insecure Twilio media URL scheme: ${parsedUrl.protocol}`);
   }
 
-  // Validate the hostname against an exact-match allowlist. The fetch URL is then
-  // reconstructed using a hard-coded literal base (server-controlled), so the hostname
-  // that reaches fetch() is never derived from user-provided input.
-  const pathAndQuery = `${parsedUrl.pathname}${parsedUrl.search}`;
-  const isApiHost = parsedUrl.hostname === "api.twilio.com";
-  if (!isApiHost && parsedUrl.hostname !== "media.twiliocdn.com") {
+  // Validate the raw URL string against a fully-qualified origin allowlist
+  // (scheme + exact host + "/") using `.startsWith()` on the untrusted value
+  // itself. Matching a literal "https://<exact-host>/" prefix guarantees
+  // everything after it can only affect the path/query, never the scheme or
+  // host, so the URL re-parsed from mediaUrl below can never resolve to an
+  // attacker-controlled host — there is no relative-URL-resolution or
+  // protocol-relative-reference bypass to worry about against a plain prefix
+  // match on the full string.
+  const isApiHost = mediaUrl.startsWith("https://api.twilio.com/");
+  const isCdnHost = mediaUrl.startsWith("https://media.twiliocdn.com/");
+  if (!isApiHost && !isCdnHost) {
     throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
   }
-  // Build the safe URL from a single literal string (not the two-argument
-  // `new URL(path, base)` form). The two-argument form performs relative-URL
-  // resolution, so a pathAndQuery starting with "//" (a network-path
-  // reference, achievable via an input like "https://api.twilio.com//evil.example/path"
-  // whose .pathname is literally "//evil.example/path") would swap out the
-  // host entirely and bypass the allowlist above. Absolute single-string
-  // parsing has no such relative-resolution behavior.
-  const trustedOrigin = isApiHost ? "https://api.twilio.com" : "https://media.twiliocdn.com";
-  const safeUrl = new URL(`${trustedOrigin}${pathAndQuery}`);
 
-  // Defense-in-depth: verify the reconstructed URL still resolves to the
-  // expected trusted host before it is ever passed to fetch().
-  if (safeUrl.hostname !== new URL(trustedOrigin).hostname) {
-    throw new Error(`Untrusted Twilio media host: ${safeUrl.hostname}`);
-  }
+  // Re-parse the now-guarded mediaUrl for use at the fetch() call below, so
+  // the value passed to fetch() is derived from a reference that only exists
+  // after the allowlist prefix check above has already passed.
+  const safeUrl = new URL(mediaUrl);
 
   // Only attach credentials when the request goes directly to api.twilio.com.
   // Direct CDN URLs (media.twiliocdn.com) use pre-signed paths and must not
