@@ -40,7 +40,7 @@ jobs:
       enable-package: false
       enable-container: true
       container-registry: both
-      # Container tag lifecycle (owned by build flow v0.2, see docs in README):
+      # Container tag lifecycle (owned by build flow v0.2, see wgtechlabs/build-flow-action):
       # - push to main    -> staging-<sha> plus the floating staging tag
       # - push to dev     -> dev-<sha> plus the floating dev tag
       # - published release -> <version>, <major>.<minor>, <major>, and latest
