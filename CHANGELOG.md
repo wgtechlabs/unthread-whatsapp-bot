@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.3.2] - 2026-08-26
+
+### Security
+
+- fix qs CVE and SSRF bypass in downloadTwilioMedia (#16)
+
 ## [1.3.1] - 2026-07-15
 
 ### Changed
