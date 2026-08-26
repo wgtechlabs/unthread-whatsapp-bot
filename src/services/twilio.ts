@@ -51,6 +51,8 @@ export async function sendWhatsAppMediaMessage(
 export async function downloadTwilioMedia(
   mediaUrl: string,
 ): Promise<{ buffer: Buffer; mimeType: string }> {
+  // Parse first so malformed strings ("not-a-url") get a clear, distinct
+  // error rather than silently falling through to the scheme/host checks.
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(mediaUrl);
@@ -63,29 +65,37 @@ export async function downloadTwilioMedia(
     throw new Error(`Insecure Twilio media URL scheme: ${parsedUrl.protocol}`);
   }
 
-  const allowedHosts = ["api.twilio.com", "media.twiliocdn.com"];
-  if (
-    !allowedHosts.some(
-      (host) => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`),
-    )
-  ) {
+  // Validate the raw URL string against a fully-qualified origin allowlist
+  // (scheme + exact host + "/") using `.startsWith()` on the untrusted value
+  // itself. Matching a literal "https://<exact-host>/" prefix guarantees
+  // everything after it can only affect the path/query, never the scheme or
+  // host, so the URL re-parsed from mediaUrl below can never resolve to an
+  // attacker-controlled host — there is no relative-URL-resolution or
+  // protocol-relative-reference bypass to worry about against a plain prefix
+  // match on the full string.
+  const isApiHost = mediaUrl.startsWith("https://api.twilio.com/");
+  const isCdnHost = mediaUrl.startsWith("https://media.twiliocdn.com/");
+  if (!isApiHost && !isCdnHost) {
     throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
   }
+
+  // Re-parse the now-guarded mediaUrl for use at the fetch() call below, so
+  // the value passed to fetch() is derived from a reference that only exists
+  // after the allowlist prefix check above has already passed.
+  const safeUrl = new URL(mediaUrl);
 
   // Only attach credentials when the request goes directly to api.twilio.com.
   // Direct CDN URLs (media.twiliocdn.com) use pre-signed paths and must not
   // receive the API credentials. When api.twilio.com redirects to the CDN,
   // the Fetch spec automatically strips the Authorization header on the
   // cross-origin hop, so no additional handling is needed for that case.
-  const isApiHost =
-    parsedUrl.hostname === "api.twilio.com" || parsedUrl.hostname.endsWith(".api.twilio.com");
   const fetchHeaders: Record<string, string> = {};
   if (isApiHost) {
     const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
     fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
   }
 
-  const response = await fetch(parsedUrl.href, {
+  const response = await fetch(safeUrl, {
     headers: fetchHeaders,
     redirect: "follow",
   });
