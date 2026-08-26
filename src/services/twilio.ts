@@ -78,9 +78,7 @@ export async function downloadTwilioMedia(
   // whose .pathname is literally "//evil.example/path") would swap out the
   // host entirely and bypass the allowlist above. Absolute single-string
   // parsing has no such relative-resolution behavior.
-  const trustedOrigin = isApiHost
-    ? "https://api.twilio.com"
-    : "https://media.twiliocdn.com";
+  const trustedOrigin = isApiHost ? "https://api.twilio.com" : "https://media.twiliocdn.com";
   const safeUrl = new URL(`${trustedOrigin}${pathAndQuery}`);
 
   // Defense-in-depth: verify the reconstructed URL still resolves to the
