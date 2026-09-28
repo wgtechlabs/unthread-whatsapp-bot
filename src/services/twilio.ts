@@ -83,6 +83,9 @@ export async function downloadTwilioMedia(
       fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
     }
 
+    // CodeQL cannot model the exact-origin validation above; redirects remain
+    // manual and every destination is validated before this request.
+    // codeql[js/request-forgery]
     response = await fetch(currentUrl, { headers: fetchHeaders, redirect: "manual" });
     if (response.status < 300 || response.status >= 400) {
       break;
