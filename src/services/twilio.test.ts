@@ -67,12 +67,20 @@ describe("downloadTwilioMedia", () => {
     await expect(downloadTwilioMedia("not-a-url")).rejects.toThrow("Invalid Twilio media URL");
   });
 
-  test("uses redirect: follow to handle Twilio CDN redirects", async () => {
+  test("validates and follows trusted Twilio redirects manually", async () => {
     let capturedRedirect: RequestRedirect | undefined;
+    const capturedUrls: string[] = [];
     const fakeBody = Buffer.from("fake-image-data");
 
-    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       capturedRedirect = init?.redirect as RequestRedirect | undefined;
+      capturedUrls.push(String(url));
+      if (capturedUrls.length === 1) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: "https://media.twiliocdn.com/AC001/ME001?v=1" },
+        });
+      }
       return new Response(fakeBody, {
         status: 200,
         headers: { "content-type": "image/jpeg" },
@@ -80,7 +88,21 @@ describe("downloadTwilioMedia", () => {
     }) as unknown as typeof fetch;
 
     await downloadTwilioMedia(VALID_TWILIO_URL);
-    expect(capturedRedirect).toBe("follow");
+    expect(capturedRedirect).toBe("manual");
+    expect(capturedUrls).toEqual([VALID_TWILIO_URL, "https://media.twiliocdn.com/AC001/ME001?v=1"]);
+  });
+
+  test("rejects redirects to untrusted hosts", async () => {
+    globalThis.fetch = (async (): Promise<Response> => {
+      return new Response(null, {
+        status: 302,
+        headers: { location: UNTRUSTED_URL },
+      });
+    }) as unknown as typeof fetch;
+
+    await expect(downloadTwilioMedia(VALID_TWILIO_URL)).rejects.toThrow(
+      "Untrusted Twilio media host",
+    );
   });
 
   test("returns buffer and detected mime type on success", async () => {

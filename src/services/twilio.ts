@@ -46,8 +46,8 @@ export async function sendWhatsAppMediaMessage(
 // Download a media file from a Twilio media URL.
 // Returns a Buffer along with the response Content-Type.
 // Validates that the URL is HTTPS and belongs to a trusted Twilio host.
-// Credentials are only forwarded to api.twilio.com; direct CDN URLs and any
-// cross-origin redirect destination receive no Authorization header.
+// Credentials are only forwarded to api.twilio.com; each redirect destination
+// is validated before it is followed and receives credentials only when needed.
 export async function downloadTwilioMedia(
   mediaUrl: string,
 ): Promise<{ buffer: Buffer; mimeType: string }> {
@@ -65,40 +65,41 @@ export async function downloadTwilioMedia(
     throw new Error(`Insecure Twilio media URL scheme: ${parsedUrl.protocol}`);
   }
 
-  // Validate the raw URL string against a fully-qualified origin allowlist
-  // (scheme + exact host + "/") using `.startsWith()` on the untrusted value
-  // itself. Matching a literal "https://<exact-host>/" prefix guarantees
-  // everything after it can only affect the path/query, never the scheme or
-  // host, so the URL re-parsed from mediaUrl below can never resolve to an
-  // attacker-controlled host — there is no relative-URL-resolution or
-  // protocol-relative-reference bypass to worry about against a plain prefix
-  // match on the full string.
-  const isApiHost = mediaUrl.startsWith("https://api.twilio.com/");
-  const isCdnHost = mediaUrl.startsWith("https://media.twiliocdn.com/");
-  if (!isApiHost && !isCdnHost) {
-    throw new Error(`Untrusted Twilio media host: ${parsedUrl.hostname}`);
+  const allowedOrigins = new Set(["https://api.twilio.com", "https://media.twiliocdn.com"]);
+  const validateUrl = (url: URL): void => {
+    if (url.protocol !== "https:" || !allowedOrigins.has(url.origin)) {
+      throw new Error(`Untrusted Twilio media host: ${url.hostname}`);
+    }
+  };
+
+  validateUrl(parsedUrl);
+  let currentUrl = parsedUrl;
+  let response: Response;
+
+  for (let redirectCount = 0; ; redirectCount += 1) {
+    const fetchHeaders: Record<string, string> = {};
+    if (currentUrl.origin === "https://api.twilio.com") {
+      const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
+      fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
+    }
+
+    response = await fetch(currentUrl, { headers: fetchHeaders, redirect: "manual" });
+    if (response.status < 300 || response.status >= 400) {
+      break;
+    }
+
+    if (redirectCount >= 5) {
+      throw new Error("Too many Twilio media redirects");
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      throw new Error("Twilio media redirect is missing a destination");
+    }
+
+    currentUrl = new URL(location, currentUrl);
+    validateUrl(currentUrl);
   }
-
-  // Re-parse the now-guarded mediaUrl for use at the fetch() call below, so
-  // the value passed to fetch() is derived from a reference that only exists
-  // after the allowlist prefix check above has already passed.
-  const safeUrl = new URL(mediaUrl);
-
-  // Only attach credentials when the request goes directly to api.twilio.com.
-  // Direct CDN URLs (media.twiliocdn.com) use pre-signed paths and must not
-  // receive the API credentials. When api.twilio.com redirects to the CDN,
-  // the Fetch spec automatically strips the Authorization header on the
-  // cross-origin hop, so no additional handling is needed for that case.
-  const fetchHeaders: Record<string, string> = {};
-  if (isApiHost) {
-    const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
-    fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
-  }
-
-  const response = await fetch(safeUrl, {
-    headers: fetchHeaders,
-    redirect: "follow",
-  });
 
   if (!response.ok) {
     throw new Error(`Failed to download Twilio media: HTTP ${response.status}`);
