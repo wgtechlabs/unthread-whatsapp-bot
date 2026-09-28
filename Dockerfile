@@ -11,9 +11,7 @@ FROM node:${NODE_VERSION} AS base
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /usr/src/app
-RUN apk add --no-cache dumb-init && \
-    rm -rf /usr/local/lib/node_modules/npm && \
-    rm -f /usr/local/bin/npm /usr/local/bin/npx
+RUN apk add --no-cache dumb-init
 
 FROM base AS deps
 
@@ -28,7 +26,9 @@ COPY --from=deps /usr/src/app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json ./
 COPY src ./src
 
-RUN addgroup -S app -g 1001 && \
+RUN rm -rf /usr/local/lib/node_modules/npm && \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx && \
+    addgroup -S app -g 1001 && \
     adduser -S app -u 1001 -G app && \
     chown -R app:app /usr/src/app
 
