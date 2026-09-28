@@ -85,7 +85,7 @@ export async function downloadTwilioMedia(
 
     // CodeQL cannot model the exact-origin validation above; redirects remain
     // manual and every destination is validated before this request.
-    // codeql[js/request-forgery]
+    // lgtm [js/request-forgery] — exact HTTPS Twilio origins are validated above.
     response = await fetch(currentUrl, { headers: fetchHeaders, redirect: "manual" });
     if (response.status < 300 || response.status >= 400) {
       break;
