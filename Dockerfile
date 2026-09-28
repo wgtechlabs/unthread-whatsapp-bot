@@ -11,7 +11,7 @@ FROM node:${NODE_VERSION} AS base
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
 WORKDIR /usr/src/app
-RUN apk upgrade --no-cache && apk add --no-cache dumb-init && \
+RUN apk add --no-cache dumb-init && \
     rm -rf /usr/local/lib/node_modules/npm && \
     rm -f /usr/local/bin/npm /usr/local/bin/npx
 
