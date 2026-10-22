@@ -57,6 +57,20 @@ describe("downloadTwilioMedia", () => {
     await expect(downloadTwilioMedia(UNTRUSTED_URL)).rejects.toThrow("Untrusted Twilio media host");
   });
 
+  test("keeps the fetch origin trusted when the path starts with double slashes", async () => {
+    let capturedUrl: URL | undefined;
+    globalThis.fetch = (async (url: RequestInfo | URL): Promise<Response> => {
+      capturedUrl = new URL(String(url));
+      return new Response(Buffer.from("data"), {
+        status: 200,
+        headers: { "content-type": "image/jpeg" },
+      });
+    }) as unknown as typeof fetch;
+
+    await downloadTwilioMedia("https://api.twilio.com//evil.example/media");
+    expect(capturedUrl?.origin).toBe("https://api.twilio.com");
+  });
+
   test("rejects non-HTTPS URLs before attaching credentials", async () => {
     await expect(downloadTwilioMedia("http://api.twilio.com/media/ME001")).rejects.toThrow(
       "Insecure Twilio media URL scheme",

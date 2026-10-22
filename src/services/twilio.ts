@@ -77,16 +77,20 @@ export async function downloadTwilioMedia(
   let response: Response;
 
   for (let redirectCount = 0; ; redirectCount += 1) {
+    const apiOrigin = "https://api.twilio.com";
+    const trustedOrigin =
+      currentUrl.origin === apiOrigin ? apiOrigin : "https://media.twiliocdn.com";
+    const requestUrl = new URL(trustedOrigin);
+    requestUrl.pathname = currentUrl.pathname;
+    requestUrl.search = currentUrl.search;
+
     const fetchHeaders: Record<string, string> = {};
-    if (currentUrl.origin === "https://api.twilio.com") {
+    if (trustedOrigin === apiOrigin) {
       const credentials = `${config.twilio.accountSid}:${config.twilio.authToken}`;
       fetchHeaders.Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
     }
 
-    // CodeQL cannot model the exact-origin validation above; redirects remain
-    // manual and every destination is validated before this request.
-    // lgtm [js/request-forgery] — exact HTTPS Twilio origins are validated above.
-    response = await fetch(currentUrl, { headers: fetchHeaders, redirect: "manual" });
+    response = await fetch(requestUrl, { headers: fetchHeaders, redirect: "manual" });
     if (response.status < 300 || response.status >= 400) {
       break;
     }
