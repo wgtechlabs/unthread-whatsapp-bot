@@ -4,6 +4,14 @@
 > **Maintenance mode:** Sponsorship for this project has ended, and maintainer time is limited. No new features or improvements are planned. Security and bug fixes will continue until this integration is archived. It may be archived later, but it is not archived now.
 
 <p align="center">
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot"><img src="https://ghrb.waren.build/banner?header=Unthread+WhatsApp+Bot+%F0%9F%93%B1&amp;subheader=Official+Unthread+support+bot+for+WhatsApp+via+Twilio&amp;bg=013B84-016EEA&amp;color=FFFFFF" alt="Unthread WhatsApp Bot 📱 repository banner"></a>
+</p>
+
+<p align="center">
+  <strong>Official Unthread Extension for WhatsApp support via Twilio.</strong>
+</p>
+
+<p align="center">
   <a href="https://github.com/wgtechlabs"><img src="https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&amp;longCache=true&amp;labelColor=181717&amp;style=flat-square" alt="Made by WG Tech Labs"></a>
   <a href="https://unthread.com"><img src="https://img.shields.io/badge/official-Unthread%20Extension-FF5241.svg?logo=whatsapp&amp;logoColor=white&amp;labelColor=181717&amp;style=flat-square" alt="Official Unthread WhatsApp extension"></a><br>
   <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/build-flow.yml"><img src="https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/build-flow.yml?branch=dev&amp;style=flat-square&amp;logo=github&amp;labelColor=181717&amp;label=build%20flow" alt="WhatsApp build flow status"></a>
