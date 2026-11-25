@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.3.3] - 2026-11-25
+
+### Changed
+
+- update WhatsApp README for maintenance mode (#30)
+- Bump wgtechlabs/build-flow-action/.github/workflows/app.yml (#28)
+- update Build Flow Action to v1.0.1
+- restore dev push Build Flow
+- update Bun to 1.4.4
+- upgrade build flow to v0.2.1
+- align build-flow with unthread-discord-bot (#17)
+
+### Security
+
+- update follow-redirects to 1.16.3 (#31)
+- patch body-parser decompression DoS (#27)
+- patch axios and redirect vulnerabilities
+- bind Twilio media requests to trusted origins
+- update dependencies and refresh runtime images (#21)
+- suppress validated redirect alert
+- document validated redirect request
+- address release review findings
+- harden runtime image and dependency graph
+
 ## [1.3.2] - 2026-08-26
 
 ### Security
