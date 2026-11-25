@@ -4,16 +4,13 @@
 > **Maintenance mode:** Sponsorship for this project has ended, and maintainer time is limited. No new features or improvements are planned. Security and bug fixes will continue until this integration is archived. It may be archived later, but it is not archived now.
 
 <p align="center">
-  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot"><img src="https://ghrb.waren.build/banner?header=Unthread+WhatsApp+Bot+%F0%9F%93%B1&subheader=Official+Unthread+support+bot+for+WhatsApp+via+Twilio&bg=013B84-016EEA&color=FFFFFF" alt="Unthread WhatsApp Bot 📱 repository banner"></a>
-</p>
-
-<p align="center">
-  <strong>Official Unthread Extension for WhatsApp support via Twilio.</strong>
-</p>
-
-<p align="center">
-  [![made by](https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&longCache=true&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs) [![official](https://img.shields.io/badge/official-Unthread%20Extension-FF5241.svg?logo=whatsapp&logoColor=white&labelColor=181717&style=flat-square)](https://unthread.com)<br>
-  [![build flow workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/build-flow.yml?branch=dev&style=flat-square&logo=github&labelColor=181717&label=build%20flow)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/build-flow.yml) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![version](https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&labelColor=181717&color=default&style=flat-square&label=version)](https://github.com/wgtechlabs/unthread-whatsapp-bot/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license)
+  <a href="https://github.com/wgtechlabs"><img src="https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&amp;longCache=true&amp;labelColor=181717&amp;style=flat-square" alt="made by"></a>
+  <a href="https://unthread.com"><img src="https://img.shields.io/badge/official-Unthread%20Extension-FF5241.svg?logo=whatsapp&amp;logoColor=white&amp;labelColor=181717&amp;style=flat-square" alt="official"></a><br>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/build-flow.yml"><img src="https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/build-flow.yml?branch=dev&amp;style=flat-square&amp;logo=github&amp;labelColor=181717&amp;label=build%20flow" alt="build flow workflow"></a>
+  <a href="https://github.com/sponsors/wgtechlabs"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&amp;logo=github&amp;logoColor=white&amp;labelColor=181717&amp;style=flat-square" alt="sponsors"></a><br>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/releases"><img src="https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&amp;labelColor=181717&amp;color=default&amp;style=flat-square&amp;label=version" alt="version"></a>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers"><img src="https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&amp;logo=github&amp;labelColor=181717&amp;color=yellow&amp;style=flat-square" alt="star"></a>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license"><img src="https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&amp;logo=github&amp;labelColor=181717&amp;style=flat-square" alt="license"></a>
 </p>
 
 ## 💎 Sponsors & Partners
