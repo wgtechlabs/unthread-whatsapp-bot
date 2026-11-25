@@ -1,27 +1,48 @@
-# Unthread WhatsApp Bot 📱 [![made by](https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&longCache=true&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs) [![official](https://img.shields.io/badge/official-Unthread%20Extension-FF5241.svg?logo=whatsapp&logoColor=white&labelColor=181717&style=flat-square)](https://unthread.com)
+# Unthread WhatsApp Bot 📱
 
-[![banner](https://ghrb.waren.build/banner?header=Unthread+WhatsApp+Bot+%F0%9F%93%B1&subheader=Official+Unthread+support+bot+for+WhatsApp+via+Twilio&bg=013B84-016EEA&color=FFFFFF)](https://github.com/wgtechlabs/unthread-whatsapp-bot)
+> [!WARNING]
+> **Maintenance mode:** Sponsorship for this project has ended, and maintainer time is limited. No new features or improvements are planned. Security and bug fixes will continue until this integration is archived. It may be archived later, but it is not archived now.
 
-[![build flow workflow](https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/build-flow.yml?branch=dev&style=flat-square&logo=github&labelColor=181717&label=build%20flow)](https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/build-flow.yml) [![sponsors](https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&logo=github&logoColor=white&labelColor=181717&style=flat-square)](https://github.com/sponsors/wgtechlabs) [![version](https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&labelColor=181717&color=default&style=flat-square&label=version)](https://github.com/wgtechlabs/unthread-whatsapp-bot/releases) [![star](https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&color=yellow&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers) [![license](https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&logo=github&labelColor=181717&style=flat-square)](https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license)
+<p align="center">
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot"><img src="https://ghrb.waren.build/banner?header=Unthread+WhatsApp+Bot+%F0%9F%93%B1&amp;subheader=Official+Unthread+support+bot+for+WhatsApp+via+Twilio&amp;bg=013B84-016EEA&amp;color=FFFFFF" alt="Unthread WhatsApp Bot 📱 repository banner"></a>
+</p>
 
-Official Unthread Extension for WhatsApp support via Twilio.
+<p align="center">
+  <strong>Official Unthread Extension for WhatsApp support via Twilio.</strong>
+</p>
 
-This integration does three core things:
+<p align="center">
+  <a href="https://github.com/wgtechlabs"><img src="https://img.shields.io/badge/made%20by-WG%20Tech%20Labs-0060a0.svg?logo=github&amp;longCache=true&amp;labelColor=181717&amp;style=flat-square" alt="Made by WG Tech Labs"></a>
+  <a href="https://unthread.com"><img src="https://img.shields.io/badge/official-Unthread%20Extension-FF5241.svg?logo=whatsapp&amp;logoColor=white&amp;labelColor=181717&amp;style=flat-square" alt="Official Unthread WhatsApp extension"></a><br>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/actions/workflows/build-flow.yml"><img src="https://img.shields.io/github/actions/workflow/status/wgtechlabs/unthread-whatsapp-bot/build-flow.yml?branch=dev&amp;style=flat-square&amp;logo=github&amp;labelColor=181717&amp;label=build%20flow" alt="WhatsApp build flow status"></a>
+  <a href="https://github.com/sponsors/wgtechlabs"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&amp;logo=github&amp;logoColor=white&amp;labelColor=181717&amp;style=flat-square" alt="Sponsor WG Tech Labs"></a><br>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/releases"><img src="https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&amp;labelColor=181717&amp;color=default&amp;style=flat-square&amp;label=version" alt="Latest WhatsApp release version"></a>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers"><img src="https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&amp;logo=github&amp;labelColor=181717&amp;color=yellow&amp;style=flat-square" alt="GitHub stars"></a>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license"><img src="https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&amp;logo=github&amp;labelColor=181717&amp;style=flat-square" alt="GPL-3.0 license"></a>
+</p>
+
+## 💎 Sponsors & Partners
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://railway.com"><picture><source media="(prefers-color-scheme: dark)" srcset="./.github/assets/sponsors/railway-logotype-light.svg"><img src="./.github/assets/sponsors/railway-logotype-dark.svg" width="150" alt="Railway logo"></picture></a>
+      <p>Cloud platform for deploying and hosting apps, databases, and infrastructure.</p>
+    </td>
+    <td width="50%" align="center">
+      <a href="https://www.docker.com"><img src="./.github/assets/sponsors/docker-logo.svg" width="150" alt="Docker logo"></a>
+      <p>Platform for building, sharing, and running containerized applications.</p>
+    </td>
+  </tr>
+</table>
+
+## ✨ Features
 
 - Converts inbound WhatsApp messages into Unthread conversations
 - Sends agent replies from Unthread back to WhatsApp
 - Sends automatic status system messages (created, closed, on hold, resumed)
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/CveS2G)
-
-## 🤗 Special Thanks
-
-<!-- markdownlint-disable MD033 -->
-| <div align="center">💎 Platinum Sponsor</div> |
-| :-----------------------------------------: |
-| <a href="https://unthread.com"><img src="https://raw.githubusercontent.com/wgtechlabs/unthread-discord-bot/main/.github/assets/sponsors/platinum_unthread.png" width="250" alt="Unthread"></a> |
-| <div align="center"><a href="https://unthread.com" target="_blank"><b>Unthread</b></a><br/>Streamlined support ticketing for modern teams.</div> |
-<!-- markdownlint-enable MD033 -->
 
 ## 🤔 How It Works
 
@@ -153,7 +174,7 @@ Join our community discussions to get help, share ideas, and connect with other 
 - 📸 **[Showcase](https://github.com/wgtechlabs/unthread-whatsapp-bot/discussions/categories/showcase)**: Show and tell your implementation
 - 💖 **[Wall of Love](https://github.com/wgtechlabs/unthread-whatsapp-bot/discussions/categories/wall-of-love)**: Share your experience with the bot
 - 🛟 **[Help & Support](https://github.com/wgtechlabs/unthread-whatsapp-bot/discussions/categories/help-support)**: Get assistance from the community
-- 🧠 **[Ideas](https://github.com/wgtechlabs/unthread-whatsapp-bot/discussions/categories/ideas)**: Suggest new features and improvements
+- 🧠 **[Ideas](https://github.com/wgtechlabs/unthread-whatsapp-bot/discussions/categories/ideas)**: Feature requests and improvements are not planned during maintenance mode
 
 ## 🛟 Help & Support
 
@@ -163,9 +184,9 @@ Need help? Check our [Help & Support](https://github.com/wgtechlabs/unthread-wha
 
 **Important**: All pull requests must be submitted to the `dev` branch. PRs to `main` will be automatically rejected.
 
-Contributions are welcome! Your code must pass `bun run typecheck` before merging.
+Security and bug-fix contributions are welcome during maintenance mode. Your code must pass `bun run typecheck` before merging.
 
-## 💖 Sponsors
+## 💖 Support the Project
 
 Like this project? **Leave a star**! ⭐⭐⭐⭐⭐
 
@@ -176,7 +197,7 @@ There are several ways you can support this project:
 
 ## ⭐ GitHub Star Nomination
 
-Found this project helpful? Consider nominating me **(@warengonzaga)** for the [GitHub Star program](https://stars.github.com/nominate/)! This recognition supports ongoing development of this project and [my other open-source projects](https://github.com/warengonzaga?tab=repositories). GitHub Stars are recognized for their significant contributions to the developer community — your nomination makes a difference and encourages continued innovation!
+Found this project helpful? Consider nominating me **(@warengonzaga)** for the [GitHub Star program](https://stars.github.com/nominate/)! This recognition supports continued maintenance of this integration and [my other open-source projects](https://github.com/warengonzaga?tab=repositories). GitHub Stars are recognized for their significant contributions to the developer community — your nomination makes a difference and helps keep maintenance work visible.
 
 ## 📃 License
 
