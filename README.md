@@ -18,7 +18,7 @@
   <a href="https://github.com/sponsors/wgtechlabs"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-%23db61a2.svg?&amp;logo=github&amp;logoColor=white&amp;labelColor=181717&amp;style=flat-square" alt="Sponsor WG Tech Labs"></a><br>
   <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/releases"><img src="https://img.shields.io/github/release/wgtechlabs/unthread-whatsapp-bot.svg?logo=github&amp;labelColor=181717&amp;color=default&amp;style=flat-square&amp;label=version" alt="Latest WhatsApp release version"></a>
   <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/stargazers"><img src="https://img.shields.io/github/stars/wgtechlabs/unthread-whatsapp-bot.svg?&amp;logo=github&amp;labelColor=181717&amp;color=yellow&amp;style=flat-square" alt="GitHub stars"></a>
-  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/LICENSE"><img src="https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&amp;logo=github&amp;labelColor=181717&amp;style=flat-square" alt="GPL-3.0 license"></a>
+  <a href="https://github.com/wgtechlabs/unthread-whatsapp-bot/blob/main/license"><img src="https://img.shields.io/github/license/wgtechlabs/unthread-whatsapp-bot.svg?&amp;logo=github&amp;labelColor=181717&amp;style=flat-square" alt="GPL-3.0 license"></a>
 </p>
 
 ## 💎 Sponsors & Partners
